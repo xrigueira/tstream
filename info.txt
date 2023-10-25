@@ -5,7 +5,7 @@ Additionally it can work with nonuniform time distances.
 
 The mathematical summary would to find the function f such that:
 	Q_{t+1} = f(X_{t}, X_{t-1}, \dots, X_{t-n})
-Where Q is the stream flow in mm (because they divided discharge by the area of the water shed,
+Where Q is the stream flow in mm (because they divided discharge by the area of the water shed),
 and X is the snow output from the model: snow melted + precipitation.
 Q starts on October 2nd 1980, while X starts on October 1st, 1980
 
