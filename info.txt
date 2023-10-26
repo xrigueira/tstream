@@ -35,6 +35,6 @@ https://medium.com/mlearning-ai/transformer-implementation-for-time-series-forec
 https://github.com/nok-halfspace/Transformer-Time-Series-Forecasting
 
 Autoformer: https://github.com/thuml/Autoformer
-FEDformer: https://github.com/MAZiqing/FEDformerç
+FEDformer: https://github.com/MAZiqing/FEDformer
 FEDformer is probably better for long sequence prediction tasks, 
 as the authors state in the paper when they compare it with th Autoformer.
