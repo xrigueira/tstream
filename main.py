@@ -19,10 +19,10 @@ logging.basicConfig(format='%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)
 class Main():
     
     def __init__(self, is_training, model_id, model, data, root_path, data_path, features, target, freq, 
-                checkpoints, seq_len, label_len, pred_len, bucket_size, n_hashed, enc_in, dec_in, c_out,
+                checkpoints, seq_len, label_len, pred_len, bucket_size, n_hashes, enc_in, dec_in, c_out,
                 d_model, n_head, e_layers, d_layers, d_ff, moving_avg, factor, distil, dropout, embed,
                 activation, output_attention, do_predict, num_workers, itr, train_epochs, batch_size,
-                patience, learning_rate, des, los, lradj, use_amp, use_gpu, gpu, use_multi_gpu, devices) -> None:
+                patience, learning_rate, des, loss, lradj, use_amp, use_gpu, gpu, use_multi_gpu, devices) -> None:
         
         # basic config
         self.is_training = is_training              # status
@@ -45,7 +45,7 @@ class Main():
         
         # model definition
         self.bucket_size = bucket_size              # for Reformer
-        self.n_hashed = n_hashed                    # for Reformer
+        self.n_hashes = n_hashes                    # for Reformer
         self.enc_in = enc_in                        # encoder input size
         self.dec_in = dec_in                        # decoder input size
         self.c_out = c_out                          # output size
@@ -71,7 +71,7 @@ class Main():
         self.patience = patience                    # early stopping patience
         self.learning_rate = learning_rate          # optimizer learning rate
         self.des = des                              # exp description
-        self.loss = los                             # loss function
+        self.loss = loss                            # loss function
         self.lradj = lradj                          # adjust learning rate
         self.use_amp = use_amp                      # use automatic mized precision training
         
@@ -386,36 +386,39 @@ if __name__ == '__main__':
     
     # Create an instance of the Main class
     # Add default possitional arguments from here: https://github.com/thuml/Autoformer/blob/main/run.py
-    experiment = Main(is_training=1, model_id='test', model='Autoformer', data='weather', root_path='./data/weather/', data_path='weather.csv', features='M', target='OT',
-                    freq='10min', checkpoints='./checkpoints/', seq_len=96, label_len=48, pred_len=96, embed='timeF',
-                    num_workers=8, batch_size=32, use_gpu=False, gpu=0, use_multi_gpu=False, devices='0, 1, 2, 3')
+    experiment = Main(is_training=1, model_id='test', model='Autoformer', data='weather', root_path='./data/weather/', data_path='weather.csv', 
+                    features='M', target='OT', freq='10min', checkpoints='./checkpoints/', seq_len=96, label_len=48, pred_len=96, bucket_size=4, 
+                    n_hashes=4, enc_in=7, dec_in=7, c_out=7, d_model=512, n_head=8, e_layers=2, d_layers=1, d_ff=2048, moving_avg=25, factor=1, 
+                    distil=True, dropout=0.05, embed='timeF', activation='gelu', output_attention='store_true', do_predict='store_true', 
+                    num_workers=10, itr=1, train_epochs=10, batch_size=32, patience=3, learning_rate=0.0001, des='test', loss='mse', lradj='type1', 
+                    use_amp='store_true', use_gpu=False, gpu=0, use_multi_gpu=False, devices='0, 1, 2, 3')
     
     data_set, data_loader = experiment.data_provider(flag='train')
     
-    if experiment.is_training:
-        for ii in range(experiment.itr):
-            # setting record of experiments
-            setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
-                experiment.model_id,
-                experiment.model,
-                experiment.data,
-                experiment.features,
-                experiment.seq_len,
-                experiment.label_len,
-                experiment.pred_len,
-                experiment.d_model,
-                experiment.n_heads,
-                experiment.e_layers,
-                experiment.d_layers,
-                experiment.d_ff,
-                experiment.factor,
-                experiment.embed,
-                experiment.distil,
-                experiment.des, ii)
+    # if experiment.is_training:
+    #     for ii in range(experiment.itr):
+    #         # setting record of experiments
+    #         setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
+    #             experiment.model_id,
+    #             experiment.model,
+    #             experiment.data,
+    #             experiment.features,
+    #             experiment.seq_len,
+    #             experiment.label_len,
+    #             experiment.pred_len,
+    #             experiment.d_model,
+    #             experiment.n_heads,
+    #             experiment.e_layers,
+    #             experiment.d_layers,
+    #             experiment.d_ff,
+    #             experiment.factor,
+    #             experiment.embed,
+    #             experiment.distil,
+    #             experiment.des, ii)
             
-            experiment.train(setting=setting)
+            # experiment.train(setting=setting)
             
-            experiment.test(setting=setting)
+            # experiment.test(setting=setting)
             
-            if experiment.do_predict:
-                experiment.predict(setting, True)
+            # if experiment.do_predict:
+            #     experiment.predict(setting, True)
