@@ -2,6 +2,7 @@
 
 import os
 import time
+import random
 import numpy as np
 import torch
 import torch.nn as nn
@@ -20,7 +21,7 @@ class Main():
     
     def __init__(self, is_training, model_id, model, data, root_path, data_path, features, target, freq, 
                 checkpoints, seq_len, label_len, pred_len, bucket_size, n_hashes, enc_in, dec_in, c_out,
-                d_model, n_head, e_layers, d_layers, d_ff, moving_avg, factor, distil, dropout, embed,
+                d_model, n_heads, e_layers, d_layers, d_ff, moving_avg, factor, distil, dropout, embed,
                 activation, output_attention, do_predict, num_workers, itr, train_epochs, batch_size,
                 patience, learning_rate, des, loss, lradj, use_amp, use_gpu, gpu, use_multi_gpu, devices) -> None:
         
@@ -50,7 +51,7 @@ class Main():
         self.dec_in = dec_in                        # decoder input size
         self.c_out = c_out                          # output size
         self.d_model = d_model                      # dimension of the model
-        self.n_head = n_head                        # number of heads
+        self.n_heads = n_heads                      # number of heads
         self.e_layers = e_layers                    # number of encoder layers
         self.d_layers = d_layers                    # number of decoder layers
         self.d_ff = d_ff                            # dimension of fcn
@@ -384,13 +385,19 @@ class Main():
     
 if __name__ == '__main__':
     
+    # Fix seeds
+    fix_seed = 2021
+    random.seed(fix_seed)
+    torch.manual_seed(fix_seed)
+    np.random.seed(fix_seed)
+    
     # Create an instance of the Main class
     # Add default possitional arguments from here: https://github.com/thuml/Autoformer/blob/main/run.py
-    experiment = Main(is_training=1, model_id='test', model='Autoformer', data='weather', root_path='./data/weather/', data_path='weather.csv', 
-                    features='M', target='OT', freq='10min', checkpoints='./checkpoints/', seq_len=96, label_len=48, pred_len=96, bucket_size=4, 
-                    n_hashes=4, enc_in=7, dec_in=7, c_out=7, d_model=512, n_head=8, e_layers=2, d_layers=1, d_ff=2048, moving_avg=25, factor=1, 
+    experiment = Main(is_training=1, model_id='test', model='Autoformer', data='electricity', root_path='./data/electricity/', data_path='electricity.csv', 
+                    features='M', target='OT', freq='h', checkpoints='./checkpoints/', seq_len=96, label_len=48, pred_len=96, bucket_size=4, 
+                    n_hashes=4, enc_in=7, dec_in=7, c_out=7, d_model=512, n_heads=8, e_layers=2, d_layers=1, d_ff=2048, moving_avg=25, factor=1, 
                     distil=True, dropout=0.05, embed='timeF', activation='gelu', output_attention='store_true', do_predict='store_true', 
-                    num_workers=10, itr=1, train_epochs=10, batch_size=32, patience=3, learning_rate=0.0001, des='test', loss='mse', lradj='type1', 
+                    num_workers=8, itr=1, train_epochs=10, batch_size=32, patience=3, learning_rate=0.0001, des='test', loss='mse', lradj='type1', 
                     use_amp='store_true', use_gpu=False, gpu=0, use_multi_gpu=False, devices='0, 1, 2, 3')
     
     data_set, data_loader = experiment.data_provider(flag='train')
