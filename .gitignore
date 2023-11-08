@@ -3,6 +3,3 @@ venv
 
 # Ignore the data
 data
-
-# Ignore PyTorch tutorial
-pytorchtut

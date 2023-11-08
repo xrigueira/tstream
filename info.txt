@@ -31,10 +31,16 @@ Then multistep resolution: Use averages per month when we train on data far from
 to daily when we are getting closer to that point.
 
 Resources:
-https://medium.com/mlearning-ai/transformer-implementation-for-time-series-forecasting-a9db2db5c820
-https://github.com/nok-halfspace/Transformer-Time-Series-Forecasting
+One of the first codes that I though it was interesting> https://github.com/nok-halfspace/Transformer-Time-Series-Forecasting
+
+Paper in which a trasformer was used for time series prediction https://arxiv.org/abs/2001.08317
+Adapted code from that paper https://github.com/KasperGroesLudvigsen/influenza_transformer/tree/main
+Seohye code https://github.com/GW-ASU/LR-Multi-HeadAttention/blob/main/Transformer_timeadd_log_layers.ipynb
+Tutorial https://huggingface.co/blog/time-series-transformers
+Questions that may help me with encoding https://discuss.pytorch.org/t/using-transformer-on-timeseries/104759/6
 
 Autoformer: https://github.com/thuml/Autoformer
 FEDformer: https://github.com/MAZiqing/FEDformer
 FEDformer is probably better for long sequence prediction tasks, 
 as the authors state in the paper when they compare it with th Autoformer.
+
