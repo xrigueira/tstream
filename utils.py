@@ -4,11 +4,12 @@ import pandas as pd
 
 import torch
 import torch.nn as nn
+from torch import Tensor
 
 from pathlib import Path
 from typing import Optional, Any, Union, Callable, Tuple
 
-def generate_square_subsequent_mask(dim1: int, dim2: int) -> torch.Tensor:
+def generate_square_subsequent_mask(dim1: int, dim2: int) -> Tensor:
     
     """
     Generates an upper-triangular matrix of -inf, with
@@ -25,7 +26,7 @@ def generate_square_subsequent_mask(dim1: int, dim2: int) -> torch.Tensor:
     A tensor of shape [dim1, dim2]
     """
     
-    return torch.triu(torch.ones(dim1, dim2) * float('-inf', diagonal=1))
+    return torch.triu(torch.ones(dim1, dim2) * float('-inf'), diagonal=1)
 
 def get_indices_input_target(num_obs, input_len, step_size, forecast_horizon, target_len):
     

@@ -2,6 +2,7 @@ import datetime
 import numpy as np
 
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 
 import utils
@@ -18,68 +19,118 @@ timestamp_col = "timestamp"
 cutoff_date = datetime.datetime(2017, 1, 1) 
 
 ## Params
-dim_val = 512
-n_heads = 8
-n_decoder_layers = 4
-n_encoder_layers = 4
+dim_val = 128
+n_heads = 4
+n_decoder_layers = 1
+n_encoder_layers = 1
+enc_seq_len = 192 # length of input given to encoder
 dec_seq_len = 92 # length of input given to decoder
-enc_seq_len = 153 # length of input given to encoder
 output_sequence_length = 48 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
 window_size = enc_seq_len + output_sequence_length # used to slice data into sub-sequences
 step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
 in_features_encoder_linear_layer = 2048
 in_features_decoder_linear_layer = 2048
 max_seq_len = enc_seq_len
-batch_first = False
+batch_first = True # Leave on True
 
 # Define input variables 
 exogenous_vars = [] # should contain strings. Each string must correspond to a column name
 input_variables = [target_col_name] + exogenous_vars
 target_idx = 0 # index position of target in batched trg_y
 
+# Get device
+device = ('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+print(f'Using {device} device')
+
 input_size = len(input_variables)
 
 # Read data
 data = utils.read_data(timestamp_col_name=timestamp_col)
 
-# Remove test data from the dataset
+# Extract train and test data
 training_data = data[:-(round(len(data)*test_size))]
+testing_data = data[(round(len(data)*test_size)):]
 
 # Make list of (start_idx, end_idx) pairs that are used to slice the time series sequence into chuncks
 training_indices = utils.get_indices_entire_sequence(data=training_data, window_size=window_size, step_size=step_size)
+testing_indices = utils.get_indices_entire_sequence(data=testing_data, window_size=window_size, step_size=step_size)
 
 # Make instance of the custom dataset class
 training_data = ds.TransformerDataset(data=torch.tensor(training_data[input_variables].values).float(),
                                     indices=training_indices, enc_seq_len=enc_seq_len, dec_seq_len=dec_seq_len,
                                     target_seq_len=output_sequence_length)
+testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variables].values).float(),
+                                    indices=testing_indices, enc_seq_len=enc_seq_len, dec_seq_len=dec_seq_len,
+                                    target_seq_len=output_sequence_length)
 
-i, batch = next(enumerate(training_data))
+# Make dataloaders
+training_data = DataLoader(training_data, batch_size)
+testing_data = DataLoader(testing_data, batch_size)
 
-src, trg, trg_y = batch
-
-# Permute from shape [batch size, seq len, num features] to [seq len, batch size, num features]
-if batch_first == False:
-
-    shape_before = src.shape
-    src = src.permute(1, 0, 2)
-    print("src shape changed from {} to {}".format(shape_before, src.shape))
-
-    shape_before = trg.shape
-    trg = trg.permute(1, 0, 2)
-    print("src shape changed from {} to {}".format(shape_before, src.shape))
-
-# Instantiate the transformer model
-model = tst.TimeSeriesTransformer(input_size=len(input_variables), 
-                                dec_seq_len=enc_seq_len, batch_first=batch_first, num_predicted_features=1)
+# Instantiate the transformer model and send it to device
+model = tst.TimeSeriesTransformer(input_size=len(input_variables), dec_seq_len=dec_seq_len, 
+                                batch_first=batch_first, num_predicted_features=1).to(device)
 
 # Make src mask for the decoder with size
 # [batch_size*n_heads, output_sequence_length, enc_seq_len]
-src_maks = utils.generate_square_subsequent_mask(dim1=output_sequence_length, dim2=enc_seq_len)
+src_mask = utils.generate_square_subsequent_mask(dim1=output_sequence_length, dim2=enc_seq_len)
 
 # Make tgt mask for decoder with size
 # [batch_size*n_heads, output_sequence_length, output_sequence_length]
 tgt_mask = utils.generate_square_subsequent_mask(dim1=output_sequence_length, dim2=output_sequence_length)
 
-output = model(src=src, tgt=trg, src_maks=src_maks, tgt_mask=tgt_mask)
+# Define optimizer and loss function
+loss_function = nn.MSELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-# Implement training loop
+# Define the training step
+def train(dataloader, model, loss_function, optimizer, device):
+    size = len(dataloader.dataset)
+    model.train()
+    for i, batch in enumerate(dataloader):
+        src, trg, trg_y = batch
+        src, trg, trg_y = src.to(device), trg.to(device), trg_y.to(device)
+        
+        # Compute prediction error
+        pred = model(src=src, tgt=trg, src_mask=src_mask, tgt_mask=tgt_mask)
+        pred = pred.squeeze(-1)
+        loss = loss_function(pred, trg_y)
+        
+        # Backpropagation
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        print('Current batch', i)
+        if i % 5 == 0:
+            loss, current = loss.item(), (i + 1) * len(src)
+            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+
+# Define testing step
+def test(dataloader, model, loss_function):
+    size = len(dataloader.dataset)
+    num_batches = len(dataloader)
+    model.eval()
+    test_loss = 0
+    with torch.no_grad():
+        for i, batch in dataloader:
+            src, trg, trg_y = batch
+            src, trg, trg_y = src.to(device), trg.to(device), trg_y.to(device)
+            
+            pred = model(src=src, tgt=trg, src_mask=src_mask, tgt_mask=tgt_mask)
+            pred = pred.squeeze(-1)
+            test_loss += loss_function(pred, trg_y).item()
+    
+    test_loss /+ num_batches
+    print(f"Avg loss: {test_loss:>8f}")
+
+# Update model in the training process and test it
+epochs = 5
+for t in range (epochs):
+    print(f"Epoch {t+1}\n-------------------------------")
+    train(training_data, model, loss_function, optimizer, device)
+    # test(testing_data, model, loss_function)
+print('Done!')
+
+# Save the model
+torch.save(model.state_dict(), "model.pth")
+print("Saved PyTorch Model State to model.pth")

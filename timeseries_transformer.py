@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
+
 import positional_encoder as pe
 
 class TimeSeriesTransformer(nn.Module):
@@ -90,48 +92,48 @@ class TimeSeriesTransformer(nn.Module):
         # Stack the decoder layers in nn.TransformerDecoder
         self.decoder = nn.TransformerDecoder(decoder_layer=decoder_layer, num_layers=n_decoder_layers, norm=None)
         
-        def forward(self, src: torch.Tensor, tgt: torch.Tensor, src_mask: torch.Tensor=None, tgt_mask: torch.Tensor=None) -> torch.Tensor:
-            
-            """
-            Arguments:
-            src: the output sequence of the encoder. Shape: (S, E) for unbatched input, (S, N, E) if batch_first=False
-            or (N, S, E) if batch_first=True or (N, S, E) if batch_first=True, where S is the source of the sequence
-            length, N is the batch size, and E is the number of features (1 if univariate).
-            tgt: the sequence to the decoder. Shape (T, E) for unbatched input, (T, N, E)(T, N, E) if batch_first=False
-            or (N, T, E) if batch_first=True, where T is the target sequence length, N is the batch size, and E is
-            the number of features (1 if univariate).
-            src_mask: the mask for the src sequence to prevent the model from using data points from the target sequence.
-            tgt_mask: the mask fro the tgt sequence to prevent the model from using data points from the target sequence.
-            
-            Returns:
-            Tensor of shape: [target_sequence_length, batch_size, num_predicted_features]
-            """
-            
-            # Pass through the input layer right before the encoder
-            # src shape: [batch_size, src length, dim_val] regardless of number of input features
-            src = self.encoder_input_layer(src)
-            
-            # Pass through the positional encoding layer            
-            # src shape: [batch_size, src length, dim_val] regardless of number of input features
-            src = self.positional_encoding_layer(src)
-            
-            # Pass through all the stacked encoder layers in the encoder
-            # Masking is only needed in the encoder if input sequences are padded which they are 
-            # not in this time series use case, because all my  input sequences are naturally of 
-            # the same length. 
-            # src shape: [batch_size, enc_seq_len, dim_val]
-            src = self.encoder(src=src)
-            
-            # Pass decoder input through decoder input layer
-            # src shape: [target sequence length, batch_size, dim_val] regardless of number of input features
-            decoder_output = self.decoder_input_layer(tgt)
-            
-            # Pass through the decoder
-            # Output shape: [batch_size, target seq len, dim_val]
-            decoder_output = self.decoder(tgt=decoder_output, memory=src, tgt_mask=tgt_mask, memory_mask=src_mask)
-            
-            # Pass through the linear mapping
-            # shape [batch_size, target seq len]
-            decoder_output = self.linear_mapping(decoder_output)
-            
-            return decoder_output
+    def forward(self, src: Tensor, tgt: Tensor, src_mask: Tensor=None, tgt_mask: Tensor=None) -> Tensor:
+        
+        """
+        Arguments:
+        src: the output sequence of the encoder. Shape: (S, E) for unbatched input, (S, N, E) if batch_first=False
+        or (N, S, E) if batch_first=True or (N, S, E) if batch_first=True, where S is the source of the sequence
+        length, N is the batch size, and E is the number of features (1 if univariate).
+        tgt: the sequence to the decoder. Shape (T, E) for unbatched input, (T, N, E)(T, N, E) if batch_first=False
+        or (N, T, E) if batch_first=True, where T is the target sequence length, N is the batch size, and E is
+        the number of features (1 if univariate).
+        src_mask: the mask for the src sequence to prevent the model from using data points from the target sequence.
+        tgt_mask: the mask fro the tgt sequence to prevent the model from using data points from the target sequence.
+        
+        Returns:
+        Tensor of shape: [target_sequence_length, batch_size, num_predicted_features]
+        """
+        
+        # Pass through the input layer right before the encoder
+        # src shape: [batch_size, src length, dim_val] regardless of number of input features
+        src = self.encoder_input_layer(src)
+        
+        # Pass through the positional encoding layer            
+        # src shape: [batch_size, src length, dim_val] regardless of number of input features
+        src = self.positional_encoding_layer(src)
+        
+        # Pass through all the stacked encoder layers in the encoder
+        # Masking is only needed in the encoder if input sequences are padded which they are 
+        # not in this time series use case, because all my  input sequences are naturally of 
+        # the same length. 
+        # src shape: [batch_size, enc_seq_len, dim_val]
+        src = self.encoder(src=src)
+        
+        # Pass decoder input through decoder input layer
+        # src shape: [target sequence length, batch_size, dim_val] regardless of number of input features
+        decoder_output = self.decoder_input_layer(tgt)
+        
+        # Pass through the decoder
+        # Output shape: [batch_size, target seq len, dim_val]
+        decoder_output = self.decoder(tgt=decoder_output, memory=src, tgt_mask=tgt_mask, memory_mask=src_mask)
+        
+        # Pass through the linear mapping
+        # shape [batch_size, target seq len]
+        decoder_output = self.linear_mapping(decoder_output)
+        
+        return decoder_output
