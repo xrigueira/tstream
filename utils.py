@@ -114,7 +114,7 @@ def get_indices_entire_sequence(data: pd.DataFrame, window_size: int, step_size:
         
     return indices
 
-def read_data(data_dir: Union[str, Path] = 'data', timestamp_col_name: str='timestamp') -> pd.DataFrame:
+def read_data(data_dir: Union[str, Path] = 'data/timeseries', timestamp_col_name: str='timestamp') -> pd.DataFrame:
     
     """Read data from csv file and return a pd.DataFrame object.
     ----------
@@ -129,7 +129,7 @@ def read_data(data_dir: Union[str, Path] = 'data', timestamp_col_name: str='time
     
     # Ensure that `data_dir` is a Path object
     data_dir = Path(data_dir)
-
+    print(data_dir)
     # Read csv file
     csv_files = list(data_dir.glob("*.csv"))
     
@@ -142,8 +142,7 @@ def read_data(data_dir: Union[str, Path] = 'data', timestamp_col_name: str='time
 
     print("Reading file in {}".format(data_path))
     
-    data = pd.read_csv(data_path, parse_dates=[timestamp_col_name], index_col=[timestamp_col_name], 
-                    infer_datetime_format=True, low_memory=False)
+    data = pd.read_csv(data_path, parse_dates=[timestamp_col_name], index_col=[timestamp_col_name],  low_memory=False)
     
     # Make sure all "n/e" values have been removed from df. 
     if is_ne_in_df(data):
