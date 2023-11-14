@@ -40,22 +40,22 @@ class TimeSeriesTransformer(nn.Module):
     Available at: http://arxiv.org/abs/1706.03762 (Accessed: 9 March 2022).
     """
     
-    def __init__(self, input_size: int, dec_seq_len: int, batch_first: bool, out_seq_len: int=58,
-                dim_val: int=512, n_encoder_layers: int=4, n_decoder_layers: int=4, n_heads: int=8,
-                dropout_encoder: float=0.2, dropout_decoder: float=0.2, dropout_pos_enc: float=0.1,
+    def __init__(self, input_size: int, decoder_sequence_len: int, batch_first: bool, out_sequence_len: int=58,
+                d_model: int=512, n_encoder_layers: int=4, n_decoder_layers: int=4, n_heads: int=8,
+                dropout_encoder: float=0.2, dropout_decoder: float=0.2, dropout_pos_encoder: float=0.1,
                 dim_feedforward_encoder: int=2048, dim_feedforward_decoder: int=2048, num_predicted_features: int=1):
         super().__init__()
         """
         Arguments:
         input_size (int): number of input variables. 1 if univariate.
-        dec_seq_len (int): the length of the input sequence fed to the decoder
-        dim_val (int): aka d_model. All sub-layers in the model produce outputs of dimension dim_val
+        decoder_sequence_len (int): the length of the input sequence fed to the decoder
+        d_model (int): all sub-layers in the model produce outputs of dimension d_model
         n_encoder_layers (int): number of stacked encoder layers in the encoder
         n_decoder_layers (int): number of stacked encoder layers in the decoder
         n_heads (int): the number of attention heads (aka parallel attention layers)
         dropout_encoder (float): the dropout rate of the encoder
         dropout_decoder (float): the dropout rate of the decoder
-        dropout_pos_enc (float): the dropout rate of the positional encoder
+        dropout_pos_encoder (float): the dropout rate of the positional encoder
         dim_feedforward_encoder (int): number of neurons in the linear layer of the encoder
         dim_feedforward_decoder (int): number of neurons in the linear layer of the decoder
         num_predicted_features (int) : the number of features you want to predict. Most of the time, 
@@ -63,22 +63,22 @@ class TimeSeriesTransformer(nn.Module):
         predict FCR-D with the same model, num_predicted_features should be 2.
         """
         
-        self.dec_seq_len = dec_seq_len
+        self.decoder_sequence_len = decoder_sequence_len
         
         # Create the three linear layers needed for the model
-        self.encoder_input_layer = nn.Linear(in_features=input_size, out_features=dim_val)
+        self.encoder_input_layer = nn.Linear(in_features=input_size, out_features=d_model)
         
-        self.decoder_input_layer = nn.Linear(in_features=num_predicted_features, out_features=dim_val)
+        self.decoder_input_layer = nn.Linear(in_features=num_predicted_features, out_features=d_model)
         
-        self.linear_mapping = nn.Linear(in_features=dim_val, out_features=num_predicted_features)
+        self.linear_mapping = nn.Linear(in_features=d_model, out_features=num_predicted_features)
         
         # Create the positional encoder
-        self.positional_encoding_layer = pe.PositionalEncoder(d_model=dim_val, dropout=dropout_pos_enc)
+        self.positional_encoding_layer = pe.PositionalEncoder(d_model=d_model, dropout=dropout_pos_encoder)
         
         # The encoder layer used in the paper is identical to the one used by Vaswani et al (2017) 
         # on which the PyTorch transformer model is based
         
-        encoder_layer = nn.TransformerEncoderLayer(d_model=dim_val, nhead=n_heads, dim_feedforward=dim_feedforward_encoder,
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward_encoder,
                                                 dropout=dropout_encoder, batch_first=batch_first)
         
 
@@ -86,7 +86,7 @@ class TimeSeriesTransformer(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=n_encoder_layers, norm=None)
         
         # Define the decoder layer
-        decoder_layer = nn.TransformerDecoderLayer(d_model=dim_val, nhead=n_heads, dim_feedforward=dim_feedforward_decoder,
+        decoder_layer = nn.TransformerDecoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward_decoder,
                                                 dropout=dropout_decoder, batch_first=batch_first)
         
         # Stack the decoder layers in nn.TransformerDecoder
@@ -110,26 +110,26 @@ class TimeSeriesTransformer(nn.Module):
         """
         
         # Pass through the input layer right before the encoder
-        # src shape: [batch_size, src length, dim_val] regardless of number of input features
+        # src shape: [batch_size, src length, d_model] regardless of number of input features
         src = self.encoder_input_layer(src)
         
         # Pass through the positional encoding layer            
-        # src shape: [batch_size, src length, dim_val] regardless of number of input features
+        # src shape: [batch_size, src length, d_model] regardless of number of input features
         src = self.positional_encoding_layer(src)
         
         # Pass through all the stacked encoder layers in the encoder
         # Masking is only needed in the encoder if input sequences are padded which they are 
         # not in this time series use case, because all my  input sequences are naturally of 
         # the same length. 
-        # src shape: [batch_size, enc_seq_len, dim_val]
+        # src shape: [batch_size, encoder_sequence_len, d_model]
         src = self.encoder(src=src)
         
         # Pass decoder input through decoder input layer
-        # src shape: [target sequence length, batch_size, dim_val] regardless of number of input features
+        # src shape: [target sequence length, batch_size, d_model] regardless of number of input features
         decoder_output = self.decoder_input_layer(tgt)
         
         # Pass through the decoder
-        # Output shape: [batch_size, target seq len, dim_val]
+        # Output shape: [batch_size, target seq len, d_model]
         decoder_output = self.decoder(tgt=decoder_output, memory=src, tgt_mask=tgt_mask, memory_mask=src_mask)
         
         # Pass through the linear mapping
