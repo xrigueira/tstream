@@ -44,3 +44,12 @@ FEDformer: https://github.com/MAZiqing/FEDformer
 FEDformer is probably better for long sequence prediction tasks, 
 as the authors state in the paper when they compare it with th Autoformer.
 
+Explained theory
+https://machinelearningmastery.com/wp-content/uploads/2021/08/attention_research_1-727x1024.png
+https://ketanhdoshi.github.io/Transformers-Overview/
+https://ketanhdoshi.github.io/Transformers-Arch/
+https://ketanhdoshi.github.io/Transformers-Attention/
+https://deepgram.com/learn/visualizing-and-explaining-transformer-models-from-the-ground-up
+https://www.youtube.com/watch?v=4Bdc55j80l8&ab_channel=TheA.I.Hacker-MichaelPhi
+https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html
+
