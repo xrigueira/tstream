@@ -45,6 +45,7 @@ class TimeSeriesTransformer(nn.Module):
                 dropout_encoder: float=0.2, dropout_decoder: float=0.2, dropout_pos_encoder: float=0.1,
                 dim_feedforward_encoder: int=2048, dim_feedforward_decoder: int=2048, num_predicted_features: int=1):
         super().__init__()
+        
         """
         Arguments:
         input_size (int): number of input variables. 1 if univariate.
@@ -64,6 +65,9 @@ class TimeSeriesTransformer(nn.Module):
         """
         
         self.decoder_sequence_len = decoder_sequence_len
+        
+        # print("input_size is: {}".format(input_size))
+        # print("d_model is: {}".format(d_model))
         
         # Create the three linear layers needed for the model
         self.encoder_input_layer = nn.Linear(in_features=input_size, out_features=d_model)
@@ -96,12 +100,11 @@ class TimeSeriesTransformer(nn.Module):
         
         """
         Arguments:
-        src: the output sequence of the encoder. Shape: (S, E) for unbatched input, (S, N, E) if batch_first=False
-        or (N, S, E) if batch_first=True or (N, S, E) if batch_first=True, where S is the source of the sequence
-        length, N is the batch size, and E is the number of features (1 if univariate).
-        tgt: the sequence to the decoder. Shape (T, E) for unbatched input, (T, N, E)(T, N, E) if batch_first=False
-        or (N, T, E) if batch_first=True, where T is the target sequence length, N is the batch size, and E is
-        the number of features (1 if univariate).
+        src: the output sequence of the encoder. Shape: (S, E) for unbatched input, (N, S, E) if 
+            batch_first=True, where S is the source of the sequence length, N is the batch size, and E is the number of 
+            features (1 if univariate).
+        tgt: the sequence to the decoder. Shape (T, E) for unbatched input, or (N, T, E) if batch_first=True, 
+            where T is the target sequence length, N is the batch size, and E is the number of features (1 if univariate).
         src_mask: the mask for the src sequence to prevent the model from using data points from the target sequence.
         tgt_mask: the mask fro the tgt sequence to prevent the model from using data points from the target sequence.
         
@@ -109,13 +112,19 @@ class TimeSeriesTransformer(nn.Module):
         Tensor of shape: [target_sequence_length, batch_size, num_predicted_features]
         """
         
+        # print("From model.forward(): Size of src as given to forward(): {}".format(src.size()))
+        # print("From model.forward(): tgt size = {}".format(tgt.size()))
+        
         # Pass through the input layer right before the encoder
         # src shape: [batch_size, src length, d_model] regardless of number of input features
         src = self.encoder_input_layer(src)
+        # print("From model.forward(): Size of src after input layer: {}".format(src.size()))
+        
         
         # Pass through the positional encoding layer            
         # src shape: [batch_size, src length, d_model] regardless of number of input features
         src = self.positional_encoding_layer(src)
+        # print("From model.forward(): Size of src after pos_enc layer: {}".format(src.size()))
         
         # Pass through all the stacked encoder layers in the encoder
         # Masking is only needed in the encoder if input sequences are padded which they are 
@@ -123,17 +132,27 @@ class TimeSeriesTransformer(nn.Module):
         # the same length. 
         # src shape: [batch_size, encoder_sequence_len, d_model]
         src = self.encoder(src=src)
-        
+        # print("From model.forward(): Size of src after encoder: {}".format(src.size()))
+
         # Pass decoder input through decoder input layer
-        # src shape: [target sequence length, batch_size, d_model] regardless of number of input features
+        # tgt shape: [target sequence length, batch_size, d_model] regardless of number of input features
         decoder_output = self.decoder_input_layer(tgt)
+        # print("From model.forward(): Size of decoder_output after linear decoder layer: {}".format(decoder_output.size()))
+        
+        # if src_mask is not None:
+        #     print("From model.forward(): Size of src_mask: {}".format(src_mask.size()))
+        # if tgt_mask is not None:
+        #     print("From model.forward(): Size of tgt_mask: {}".format(tgt_mask.size()))
         
         # Pass through the decoder
         # Output shape: [batch_size, target seq len, d_model]
         decoder_output = self.decoder(tgt=decoder_output, memory=src, tgt_mask=tgt_mask, memory_mask=src_mask)
+        # print("From model.forward(): decoder_output shape after decoder: {}".format(decoder_output.shape))
         
         # Pass through the linear mapping
         # shape [batch_size, target seq len]
         decoder_output = self.linear_mapping(decoder_output)
+        # print("From model.forward(): decoder_output size after linear_mapping = {}".format(decoder_output.size()))
+
         
         return decoder_output

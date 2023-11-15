@@ -38,7 +38,7 @@ class TransformerDataset(Dataset):
         self.decoder_sequence_len = decoder_sequence_len
         self.tgt_sequence_len = tgt_sequence_len
 
-        print("From get_src_tgt: data size = {}".format(data.size()))
+        # print("From get_src_tgt: data size = {}".format(data.size()))
 
 
     def __len__(self):
@@ -60,6 +60,8 @@ class TransformerDataset(Dataset):
         end_idx = self.indices[index][1]
 
         sequence = self.data[start_idx:end_idx]
+        
+        # print("From __getitem__: sequence length = {}".format(len(sequence)))
 
         src, tgt, tgt_y = self._get_src_tgt(sequence=sequence, encoder_sequence_len=self.encoder_sequence_len,
             decoder_sequence_len=self.decoder_sequence_len, tgt_sequence_len=self.tgt_sequence_len)

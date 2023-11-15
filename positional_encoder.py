@@ -17,7 +17,7 @@ class PositionalEncoder(nn.Module):
     Adapted from: https://pytorch.org/tutorials/beginner/transformer_tutorial.html
     """
     
-    def __init__(self, dropout: float=0.1, max_seq_len: int=5000, d_model: int=512, batch_first: bool=False) -> None:
+    def __init__(self, dropout: float=0.1, max_seq_len: int=5000, d_model: int=512, batch_first: bool=True) -> None:
         super().__init__()
         self.d_model = d_model # The dimension of the output of the sub-layers in the model
         self.dropout = nn.Dropout(p=dropout) 

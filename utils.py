@@ -66,7 +66,7 @@ def get_indices(data: pd.DataFrame, window_size: int, step_size: int) -> list:
         
     return indices
 
-def read_data(data_dir: Union[str, Path] = 'data/timeseries', timestamp_col_name: str='timestamp') -> pd.DataFrame:
+def read_data(data_dir: Union[str, Path] = 'data/utah', timestamp_col_name: str='time') -> pd.DataFrame:
     
     """Read data from csv file and return a pd.DataFrame object.
     ----------
