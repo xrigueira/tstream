@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 import utils
 import dataset as ds
-import timeseries_transformer as tst
+import transformer as tst
 
 # Hyperparams
 test_size = 0.1
@@ -26,9 +26,10 @@ d_model = 512
 n_heads = 4
 n_decoder_layers = 1
 n_encoder_layers = 1
-encoder_sequence_len = 192 # length of input given to encoder
-decoder_sequence_len = 48 # length of input given to decoder
-output_sequence_length = 48 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
+encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data)
+crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset
+decoder_sequence_len = 1 # length of input given to decoder
+output_sequence_length = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
 window_size = encoder_sequence_len + output_sequence_length # used to slice data into sub-sequences
 step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
 in_features_encoder_linear_layer = 64
@@ -44,8 +45,6 @@ print(f'Using {device} device')
 exogenous_vars = ['X'] # should contain strings. Each string must correspond to a column name
 input_variables = [tgt_col_name] + exogenous_vars
 tgt_idx = 0 # index position of target in batched tgt_y
-
-input_size = len(input_variables)
 
 # Read data
 data = utils.read_data(timestamp_col_name=timestamp_col_name)
@@ -70,17 +69,20 @@ testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variab
 training_data = DataLoader(training_data, batch_size)
 testing_data = DataLoader(testing_data, batch_size)
 
+# Update the encoder sequence length to its crushed version
+encoder_sequence_len = crushed_encoder_sequence_len
+
 # Instantiate the transformer model and send it to device
 model = tst.TimeSeriesTransformer(input_size=len(input_variables), decoder_sequence_len=decoder_sequence_len, 
                                 batch_first=batch_first, num_predicted_features=2).to(device)
 
 # Make src mask for the decoder with size
 # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
-src_mask = utils.masker(dim1=output_sequence_length, dim2=encoder_sequence_len)
+src_mask = utils.masker(dim1=output_sequence_length, dim2=encoder_sequence_len).to(device)
 
 # Make tgt mask for decoder with size
 # [batch_size*n_heads, output_sequence_length, output_sequence_length]
-tgt_mask = utils.masker(dim1=output_sequence_length, dim2=output_sequence_length)
+tgt_mask = utils.masker(dim1=output_sequence_length, dim2=output_sequence_length).to(device)
 
 # Define optimizer and loss function
 loss_function = nn.MSELoss()
@@ -96,7 +98,7 @@ def train(dataloader, model, loss_function, optimizer, device, df_training, epoc
         src, tgt, tgt_y = src.to(device), tgt.to(device), tgt.to(device)
         
         # Compute prediction error
-        pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+        pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask).to(device)
         loss = loss_function(pred, tgt_y)
         
         # Backpropagation
@@ -126,7 +128,7 @@ def test(dataloader, model, loss_function, df_testing, epoch):
             src, tgt, tgt_y = batch
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
             
-            pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+            pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask).to(device)
             test_loss += loss_function(pred, tgt_y).item()
             
             # Save results for plotting
@@ -160,3 +162,17 @@ plt.ylabel(r'loss')
 plt.legend()
 
 plt.show()
+
+# # Inference
+# y_truth = list(data.y)
+# y_infered = np.zeros([num_predictions]) # Something goes here to define the length
+# with torch.no_grad():
+#     for i in range(num_predictions):
+#         y_hat = model(all_X_data).to(device)
+#         y_infered[i] = y_hat
+
+# plt.figure(2):plt.clf()
+# plt.plot(y_truth, lable='observed')
+# plt.plot(y_hat, label='predicted')
+# plt.legend()
+# plt.show()

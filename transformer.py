@@ -1,9 +1,65 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from torch import Tensor
 
-import positional_encoder as pe
+class PositionalEncoder(nn.Module):
+    
+    """
+    The authors of the original transformer paper describe very succinctly what 
+    the positional encoding layer does and why it is needed:
+    
+    "Since our model contains no recurrence and no convolution, in order for the 
+    model to make use of the order of the sequence, we must inject some 
+    information about the relative or absolute position of the tokens in the 
+    sequence." (Vaswani et al, 2017)
+    
+    Adapted from: https://pytorch.org/tutorials/beginner/transformer_tutorial.html
+    """
+    
+    def __init__(self, dropout: float=0.1, max_seq_len: int=5000, d_model: int=512, batch_first: bool=True) -> None:
+        super().__init__()
+        self.d_model = d_model # The dimension of the output of the sub-layers in the model
+        self.dropout = nn.Dropout(p=dropout) 
+        self.batch_first = batch_first
+        
+        position = torch.arange(max_seq_len).unsqueeze(1)
+        
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+        
+        # PE(pos,2i)   = sin(pos/(10000^(2i/d_model)))
+        # PE(pos,2i+1) = cos(pos/(10000^(2i/d_model)))
+        
+        if self.batch_first:
+            pe = torch.zeros(1, max_seq_len, d_model)
+            
+            pe[0, :, 0::2] = torch.sin(position * div_term)
+            
+            pe[0, :, 1::2] = torch.cos(position * div_term)
+        
+        else:
+            pe = torch.zeros(max_seq_len, 1, d_model)
+        
+            pe[:, 0, 0::2] = torch.sin(position * div_term)
+        
+            pe[:, 0, 1::2] = torch.cos(position * div_term)
+        
+        self.register_buffer('pe', pe)
+    
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Args:
+        x: Tensor, shape [batch_size, enc_seq_len, dim_val] or 
+                        [enc_seq_len, batch_size, dim_val]
+        """
+        if self.batch_first:
+            x = x + self.pe[:,:x.size(1)]
+        else:
+            x = x + self.pe[:x.size(0)]
+
+        return self.dropout(x)
 
 class TimeSeriesTransformer(nn.Module):
     
@@ -77,14 +133,12 @@ class TimeSeriesTransformer(nn.Module):
         self.linear_mapping = nn.Linear(in_features=d_model, out_features=num_predicted_features)
         
         # Create the positional encoder
-        self.positional_encoding_layer = pe.PositionalEncoder(d_model=d_model, dropout=dropout_pos_encoder)
+        self.positional_encoding_layer = PositionalEncoder(d_model=d_model, dropout=dropout_pos_encoder)
         
         # The encoder layer used in the paper is identical to the one used by Vaswani et al (2017) 
         # on which the PyTorch transformer model is based
-        
         encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward_encoder,
                                                 dropout=dropout_encoder, batch_first=batch_first)
-        
 
         # Stack the encoder layers in nn.TransformerEncoder
         self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=n_encoder_layers, norm=None)

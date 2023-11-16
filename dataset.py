@@ -32,8 +32,8 @@ class TransformerDataset(Dataset):
     def __init__(self, data: torch.tensor, indices: list, encoder_sequence_len: int, decoder_sequence_len: int, tgt_sequence_len: int) -> None:
         super().__init__()
 
-        self.indices = indices
         self.data = data
+        self.indices = indices
         self.encoder_sequence_len = encoder_sequence_len
         self.decoder_sequence_len = decoder_sequence_len
         self.tgt_sequence_len = tgt_sequence_len
@@ -65,6 +65,8 @@ class TransformerDataset(Dataset):
 
         src, tgt, tgt_y = self._get_src_tgt(sequence=sequence, encoder_sequence_len=self.encoder_sequence_len,
             decoder_sequence_len=self.decoder_sequence_len, tgt_sequence_len=self.tgt_sequence_len)
+        
+        src = self._crush_src(src=src)
 
         return src, tgt, tgt_y
     
@@ -107,3 +109,36 @@ class TransformerDataset(Dataset):
         assert len(tgt_y) == tgt_sequence_len, "Length of tgt_y does not match target sequence length"
 
         return src, tgt, tgt_y.squeeze(-1) # change size from [batch_size, tgt_seq_len, num_features] to [batch_size, tgt_seq_len] 
+    
+    def _crush_src(self, src):
+        
+        """Summarize the values of src.
+        Finner density when we get closer to the prection point.
+        and coarse when we are far away.
+        ---------
+        Arguments:
+        src (pytorch.Tensor): input to the model.
+        
+        Returns:
+        src (pytroch.Tensor): summarized input to the model.
+        """
+        
+        num_years = 3 # Number of years with yearly average
+        num_months = 8 # Number of months with monthly average
+        num_weeks = 3*4 # Number of weeks with weakly average (#months * #weeks in a month)
+        
+        # Define start and end indixes
+        end_idx_years = num_years * 365
+        start_idx_months, end_idx_months = end_idx_years, num_years * 365 + num_months * 30
+        start_idx_weeks, end_idx_weeks = end_idx_months, num_years * 365 + num_months * 30 + num_weeks * 7
+        
+        # Reshape the tensor to represent years, months, weeks, and days
+        years_data = src[:end_idx_years].view(num_years, 365, -1).mean(dim=1)
+        months_data = src[start_idx_months:end_idx_months].view(num_months, 30, -1).mean(dim=1)
+        weeks_data = src[start_idx_weeks:end_idx_weeks].view(num_weeks, 7, -1).mean(dim=1)
+        last_month_data = src[-30:].squeeze(0)  # Keep the last month as is
+        
+        # Concatenate the reduced data to create the final tensor
+        src = torch.cat([years_data, months_data, weeks_data, last_month_data], dim=0)
+
+        return src
