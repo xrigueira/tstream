@@ -177,6 +177,7 @@ class TimeSeriesTransformer(nn.Module):
         
         # Pass through the positional encoding layer            
         # src shape: [batch_size, src length, d_model] regardless of number of input features
+        print(src.shape) # Maybe I just have to use a squeeze on source to add a dimension of 1 for the batch size. Probably have to do it with tgt and maybe tgt_y too
         src = self.positional_encoding_layer(src)
         # print("From model.forward(): Size of src after pos_enc layer: {}".format(src.size()))
         
