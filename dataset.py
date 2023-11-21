@@ -93,22 +93,23 @@ class TransformerDataset(Dataset):
         
         assert len(sequence) == encoder_sequence_len + tgt_sequence_len, "Sequence length does not equal (input length + target length)"
         
-        # encoder input
-        src = sequence[:encoder_sequence_len] 
+        # encoder input. Selects the last all variables excluding the last one (-1), which is the target
+        src = sequence[:encoder_sequence_len, :-1]
         
         # decoder input. As per the paper, it must have the same dimension as the 
         # target sequence, and it must contain the last value of src, and all
         # values of tgt_y except the last (i.e. it must be shifted right by 1)
-        tgt = sequence[encoder_sequence_len-1:len(sequence)-1]
+        tgt = sequence[encoder_sequence_len-1:len(sequence)-1, -1:] # Selects only target variable
         
         assert len(tgt) == tgt_sequence_len, "Length of tgt does not match target sequence length"
 
         # The target sequence against which the model output will be compared to compute loss
-        tgt_y = sequence[-tgt_sequence_len:]
-
+        tgt_y = sequence[-tgt_sequence_len:, -1:] # Select the target variable one step ahead
+        
         assert len(tgt_y) == tgt_sequence_len, "Length of tgt_y does not match target sequence length"
 
         return src, tgt, tgt_y.squeeze(-1) # change size from [batch_size, tgt_seq_len, num_features] to [batch_size, tgt_seq_len] 
+        # tgt_y.squeeze(-1) is reverted in the test function with tgt_y.squeeze(2). Left as it is for now.
     
     def _crush_src(self, src):
         

@@ -51,5 +51,6 @@ https://ketanhdoshi.github.io/Transformers-Arch/
 https://ketanhdoshi.github.io/Transformers-Attention/
 https://deepgram.com/learn/visualizing-and-explaining-transformer-models-from-the-ground-up
 https://www.youtube.com/watch?v=4Bdc55j80l8&ab_channel=TheA.I.Hacker-MichaelPhi
+https://www.youtube.com/watch?v=XSSTuhyAmnI&list=WL&index=22&ab_channel=AriSeff
 https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html
 

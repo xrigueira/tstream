@@ -177,7 +177,7 @@ class TimeSeriesTransformer(nn.Module):
         
         # Pass through the positional encoding layer            
         # src shape: [batch_size, src length, d_model] regardless of number of input features
-        print(src.shape) # Maybe I just have to use a squeeze on source to add a dimension of 1 for the batch size. Probably have to do it with tgt and maybe tgt_y too
+        # print(src.shape) # Maybe I just have to use a squeeze on source to add a dimension of 1 for the batch size. Probably have to do it with tgt and maybe tgt_y too
         src = self.positional_encoding_layer(src)
         # print("From model.forward(): Size of src after pos_enc layer: {}".format(src.size()))
         
@@ -191,6 +191,7 @@ class TimeSeriesTransformer(nn.Module):
 
         # Pass decoder input through decoder input layer
         # tgt shape: [target sequence length, batch_size, d_model] regardless of number of input features
+        # print(f"From model.forward(): Size of tgt before the decoder = {tgt.size()}")
         decoder_output = self.decoder_input_layer(tgt)
         # print("From model.forward(): Size of decoder_output after linear decoder layer: {}".format(decoder_output.size()))
         
@@ -208,6 +209,5 @@ class TimeSeriesTransformer(nn.Module):
         # shape [batch_size, target seq len]
         decoder_output = self.linear_mapping(decoder_output)
         # print("From model.forward(): decoder_output size after linear_mapping = {}".format(decoder_output.size()))
-
         
         return decoder_output
