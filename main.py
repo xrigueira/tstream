@@ -28,8 +28,8 @@ d_model = 128
 n_heads = 2
 n_decoder_layers = 1
 n_encoder_layers = 1
-encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data)
-crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset
+encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
+crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset 53
 decoder_sequence_len = 1 # length of input given to decoder
 output_sequence_length = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
 window_size = encoder_sequence_len + output_sequence_length # used to slice data into sub-sequences
@@ -45,6 +45,11 @@ print(f'Using {device} device')
 
 # Read data
 data = utils.read_data(timestamp_col_name=timestamp_col_name)
+
+# Normalize data
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+data.iloc[:, 1:] = scaler.fit_transform(data.iloc[:, 1:])
 
 # Extract train and test data
 training_data = data[:-(round(len(data)*test_size))]
@@ -65,16 +70,20 @@ testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variab
 # Define data for inference
 inference_data = training_data + testing_data
 
-# Make dataloaders
+# Set up dataloaders
 training_data = DataLoader(training_data, batch_size)
 testing_data = DataLoader(testing_data, batch_size)
+inference_data = DataLoader(inference_data, batch_size=1)
 
 # Update the encoder sequence length to its crushed version
 encoder_sequence_len = crushed_encoder_sequence_len
 
 # Instantiate the transformer model and send it to device
 model = tst.TimeSeriesTransformer(input_size=len(src_variables), decoder_sequence_len=decoder_sequence_len, 
-                                batch_first=batch_first, num_predicted_features=len(tgt_variables)).to(device)
+                                batch_first=batch_first, d_model=d_model, n_encoder_layers=n_encoder_layers, 
+                                n_decoder_layers=n_decoder_layers, n_heads=n_heads, dropout_encoder=0.2, 
+                                dropout_decoder=0.2, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
+                                dim_feedforward_decoder=in_features_decoder_linear_layer, num_predicted_features=len(tgt_variables)).to(device)
 
 # Make src mask for the decoder with size
 # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
@@ -86,7 +95,7 @@ tgt_mask = utils.masker(dim1=output_sequence_length, dim2=output_sequence_length
 
 # Define optimizer and loss function
 loss_function = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
 # Define the training step
 def train(dataloader, model, loss_function, optimizer, device, df_training, epoch):
@@ -96,6 +105,9 @@ def train(dataloader, model, loss_function, optimizer, device, df_training, epoc
     for i, batch in enumerate(dataloader):
         src, tgt, tgt_y = batch
         src, tgt, tgt_y = src.to(device), tgt.to(device), tgt.to(device)
+
+        # Zero out gradients for every batch
+        optimizer.zero_grad()
         
         # Compute prediction error
         pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask).to(device)
@@ -104,24 +116,21 @@ def train(dataloader, model, loss_function, optimizer, device, df_training, epoc
         # Backpropagation
         loss.backward()
         optimizer.step()
-        optimizer.zero_grad()
         
         # Save results for plotting
         training_loss.append(loss.item())
         epoch_train_loss = np.mean(training_loss)
         df_training.loc[epoch] = [epoch, epoch_train_loss]
         
-        print('Current batch', i)
-        if i % 1== 0:
+        if i % 10 == 0:
+            print('Current batch', i)
             loss, current = loss.item(), (i + 1) * len(src)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
 # Define testing step
 def test(dataloader, model, loss_function, device, df_testing, epoch):
-    size = len(dataloader.dataset)
     num_batches = len(dataloader)
     model.eval()
-    test_loss = 0
     testing_loss = [] # For plotting purposes
     with torch.no_grad():
         for batch in dataloader:
@@ -129,29 +138,33 @@ def test(dataloader, model, loss_function, device, df_testing, epoch):
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
             
             pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask).to(device)
-            test_loss += loss_function(pred, tgt_y.unsqueeze(2))
+            loss = loss_function(pred, tgt_y.unsqueeze(2))
             
             # Save results for plotting
-            testing_loss.append(test_loss.item())
+            testing_loss.append(loss.item())
             epoch_test_loss = np.mean(testing_loss)
             df_testing.loc[epoch] = [epoch, epoch_test_loss]
     
-    test_loss /+ num_batches
-    print(f"Avg loss: {test_loss:>8f}")
+    loss /= num_batches
+    print(f"Avg test loss: {loss:>8f}")
 
 # Update model in the training process and test it
-epochs = 1
+epochs = 5
 df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
 df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
-for t in range (epochs):
+for t in range(epochs):
     print(f"Epoch {t+1}\n-------------------------------")
     train(training_data, model, loss_function, optimizer, device, df_training, epoch=t)
     test(testing_data, model, loss_function, device, df_testing, epoch=t)
 print('Done!')
 
 # # Save the model
-# torch.save(model.state_dict(), "model.pth")
-# print("Saved PyTorch Model State to model.pth")
+# torch.save(model, "models/model.pth")
+# print("Saved PyTorch entire model to models/model.pth")
+
+# # Load the model
+# model = torch.load("models/model.pth").to(device)
+# print('Loaded PyTorch model from models/model.pth')
 
 # Inference
 # Get ground truth
@@ -159,19 +172,20 @@ tgt_y_truth = torch.zeros(len(inference_data))
 for i, (src, tgt, tgt_y) in enumerate(inference_data):
     tgt_y_truth[i] = tgt_y
 
+# Define tensor to store the predictions
 tgt_y_hat = torch.zeros((len(inference_data)), device=device)
 
 # Perform inference
+model.eval()
 with torch.no_grad():
     for i, sample in enumerate(inference_data):
         src, tgt, tgt_y = sample
-        src, tgt, tgt_y = src.unsqueeze(0), tgt.unsqueeze(0), tgt_y.unsqueeze(0)
-        
         src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
 
         pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask).to(device)
+        # print(pred, tgt_y)
         tgt_y_hat[i] = pred
-
+print(tgt_y_hat)
 # Pass target_y_hat to cpu for plotting purposes
 tgt_y_hat = tgt_y_hat.cpu()
 

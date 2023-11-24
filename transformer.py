@@ -19,7 +19,7 @@ class PositionalEncoder(nn.Module):
     Adapted from: https://pytorch.org/tutorials/beginner/transformer_tutorial.html
     """
     
-    def __init__(self, dropout: float=0.1, max_seq_len: int=5000, d_model: int=512, batch_first: bool=True) -> None:
+    def __init__(self, dropout: float, max_seq_len: int, d_model: int, batch_first: bool=True) -> None:
         super().__init__()
         self.d_model = d_model # The dimension of the output of the sub-layers in the model
         self.dropout = nn.Dropout(p=dropout) 
@@ -96,10 +96,10 @@ class TimeSeriesTransformer(nn.Module):
     Available at: http://arxiv.org/abs/1706.03762 (Accessed: 9 March 2022).
     """
     
-    def __init__(self, input_size: int, decoder_sequence_len: int, batch_first: bool, out_sequence_len: int=58,
-                d_model: int=512, n_encoder_layers: int=4, n_decoder_layers: int=4, n_heads: int=8,
-                dropout_encoder: float=0.2, dropout_decoder: float=0.2, dropout_pos_encoder: float=0.1,
-                dim_feedforward_encoder: int=2048, dim_feedforward_decoder: int=2048, num_predicted_features: int=1):
+    def __init__(self, input_size: int, decoder_sequence_len: int, batch_first: bool,
+                d_model: int, n_encoder_layers: int, n_decoder_layers: int, n_heads: int,
+                dropout_encoder: float, dropout_decoder: float, dropout_pos_encoder: float,
+                dim_feedforward_encoder: int, dim_feedforward_decoder: int, num_predicted_features: int):
         super().__init__()
         
         """
@@ -132,8 +132,8 @@ class TimeSeriesTransformer(nn.Module):
         
         self.linear_mapping = nn.Linear(in_features=d_model, out_features=num_predicted_features)
         
-        # Create the positional encoder
-        self.positional_encoding_layer = PositionalEncoder(d_model=d_model, dropout=dropout_pos_encoder)
+        # Create the positional encoder dropout, max_seq_len, d_model, batch_first
+        self.positional_encoding_layer = PositionalEncoder(dropout=dropout_pos_encoder, max_seq_len=5000, d_model=d_model, batch_first=batch_first)
         
         # The encoder layer used in the paper is identical to the one used by Vaswani et al (2017) 
         # on which the PyTorch transformer model is based
