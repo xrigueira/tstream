@@ -13,7 +13,7 @@ import dataset as ds
 import transformer as tst
 
 # Hyperparams
-test_size = 0.1
+test_size = 0.2
 batch_size = 128
 src_variables = ['X']
 tgt_variables = ['y']
@@ -46,14 +46,19 @@ print(f'Using {device} device')
 # Read data
 data = utils.read_data(timestamp_col_name=timestamp_col_name)
 
-# Normalize data
-from sklearn.preprocessing import MinMaxScaler
-scaler = MinMaxScaler()
-data.iloc[:, 1:] = scaler.fit_transform(data.iloc[:, 1:])
-
 # Extract train and test data
 training_data = data[:-(round(len(data)*test_size))]
 testing_data = data[(round(len(data)*(1-test_size))):]
+
+# Normalize the data
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+
+# Fit scaler on the training set
+scaler.fit(training_data.iloc[:, 1:])
+
+training_data.iloc[:, 1:] = scaler.transform(training_data.iloc[:, 1:])
+testing_data.iloc[:, 1:] = scaler.transform(testing_data.iloc[:, 1:])
 
 # Make list of (start_idx, end_idx) pairs that are used to slice the time series sequence into chuncks
 training_indices = utils.get_indices(data=training_data, window_size=window_size, step_size=step_size)
@@ -71,8 +76,8 @@ testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variab
 inference_data = training_data + testing_data
 
 # Set up dataloaders
-training_data = DataLoader(training_data, batch_size)
-testing_data = DataLoader(testing_data, batch_size)
+training_data = DataLoader(training_data, batch_size, shuffle=True)
+testing_data = DataLoader(testing_data, batch_size, shuffle=True)
 inference_data = DataLoader(inference_data, batch_size=1)
 
 # Update the encoder sequence length to its crushed version
@@ -149,7 +154,7 @@ def test(dataloader, model, loss_function, device, df_testing, epoch):
     print(f"Avg test loss: {loss:>8f}")
 
 # Update model in the training process and test it
-epochs = 20
+epochs = 5
 df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
 df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
 for t in range(epochs):
