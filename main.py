@@ -24,8 +24,8 @@ timestamp_col_name = "time"
 cutoff_date = datetime.datetime(1980, 1, 1) 
 
 # Params
-d_model = 128
-n_heads = 2
+d_model = 256
+n_heads = 4
 n_decoder_layers = 1
 n_encoder_layers = 1
 encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
@@ -34,8 +34,8 @@ decoder_sequence_len = 1 # length of input given to decoder
 output_sequence_length = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
 window_size = encoder_sequence_len + output_sequence_length # used to slice data into sub-sequences
 step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
-in_features_encoder_linear_layer = 32
-in_features_decoder_linear_layer = 32
+in_features_encoder_linear_layer = 128
+in_features_decoder_linear_layer = 128
 max_sequence_len = encoder_sequence_len
 batch_first = True
 
@@ -149,7 +149,7 @@ def test(dataloader, model, loss_function, device, df_testing, epoch):
     print(f"Avg test loss: {loss:>8f}")
 
 # Update model in the training process and test it
-epochs = 5
+epochs = 20
 df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
 df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
 for t in range(epochs):
@@ -206,3 +206,26 @@ plt.xlabel(r'time (days)')
 plt.ylabel(r'y')
 plt.legend()
 plt.show()
+
+# Metrics
+# np.save('tgt_y_truth.npy', tgt_y_truth, allow_pickle=False, fix_imports=False)
+# np.save('tgt_y_hat.npy', tgt_y_hat, allow_pickle=False, fix_imports=False)
+
+from sklearn.metrics import mean_squared_error
+
+tgt_y_truth_train, tgt_y_truth_test = tgt_y_truth[:-(round(len(tgt_y_truth)*test_size))], tgt_y_truth[(round(len(tgt_y_truth)*(1-test_size))):]
+tgt_y_hat_train, tgt_y_hat_test = tgt_y_hat[:-(round(len(tgt_y_truth)*test_size))], tgt_y_hat[(round(len(tgt_y_truth)*(1-test_size))):]
+
+err = tgt_y_truth_train - tgt_y_hat_train
+nse = 1 - sum(np.power(err, 2)) / sum(np.power(tgt_y_truth_train - sum(tgt_y_truth_train) / (1-test_size), 2))
+mse = mean_squared_error(tgt_y_truth_train, tgt_y_hat_train)
+print('-- training result ')
+print('NSE = ', nse)
+print('MSE = ', mse)
+
+err = tgt_y_truth_test - tgt_y_hat_test
+nse = 1 - sum(np.power(err, 2)) / sum(np.power(tgt_y_truth_test - sum(tgt_y_truth_test) / (test_size), 2))
+mse = mean_squared_error(tgt_y_truth_test, tgt_y_hat_test)
+print('\n-- test result ')
+print('NSE = ', nse)
+print('MSE = ', mse)
