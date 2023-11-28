@@ -23,7 +23,6 @@ timestamp_col_name = "time"
 # Only use data from this date and onwards
 cutoff_date = datetime.datetime(1980, 1, 1) 
 
-# Params
 d_model = 256
 n_heads = 4
 n_decoder_layers = 1
