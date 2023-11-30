@@ -1,3 +1,4 @@
+import time
 import datetime
 import numpy as np
 import pandas as pd
@@ -152,7 +153,9 @@ def test(dataloader, model, loss_function, device, df_testing, epoch):
     loss /= num_batches
     print(f"Avg test loss: {loss:>8f}")
 
+
 # Update model in the training process and test it
+start_time = time.time()
 epochs = 5
 df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
 df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
@@ -160,7 +163,7 @@ for t in range(epochs):
     print(f"Epoch {t+1}\n-------------------------------")
     train(training_data, model, loss_function, optimizer, device, df_training, epoch=t)
     test(testing_data, model, loss_function, device, df_testing, epoch=t)
-print('Done!')
+print("Done! ---Execution time: %s seconds ---" % (time.time() - start_time))
 
 # # Save the model
 # torch.save(model, "models/model.pth")
@@ -211,7 +214,7 @@ plt.ylabel(r'y')
 plt.legend()
 plt.show()
 
-# Metrics
+# # Metrics
 # np.save('tgt_y_truth.npy', tgt_y_truth, allow_pickle=False, fix_imports=False)
 # np.save('tgt_y_hat.npy', tgt_y_hat, allow_pickle=False, fix_imports=False)
 
