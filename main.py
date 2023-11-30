@@ -127,7 +127,7 @@ def train(dataloader, model, loss_function, optimizer, device, df_training, epoc
         epoch_train_loss = np.mean(training_loss)
         df_training.loc[epoch] = [epoch, epoch_train_loss]
         
-        if i % 10 == 0:
+        if i % 100 == 0:
             print('Current batch', i)
             loss, current = loss.item(), (i + 1) * len(src)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
@@ -156,7 +156,7 @@ def test(dataloader, model, loss_function, device, df_testing, epoch):
 
 # Update model in the training process and test it
 start_time = time.time()
-epochs = 5
+epochs = 10
 df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
 df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
 for t in range(epochs):
@@ -192,7 +192,7 @@ with torch.no_grad():
         pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask).to(device)
         # print(pred, tgt_y)
         tgt_y_hat[i] = pred
-print(tgt_y_hat)
+
 # Pass target_y_hat to cpu for plotting purposes
 tgt_y_hat = tgt_y_hat.cpu()
 
