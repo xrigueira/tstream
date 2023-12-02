@@ -68,10 +68,6 @@ class TimeSeriesTransformer(nn.Module):
     forecasting. This time series transformer model is based on the paper by
     Wu et al (2020) [1]. The paper will be referred to as "the paper".
 
-    A detailed description of the code can be found in my article here:
-
-    https://towardsdatascience.com/how-to-make-a-pytorch-transformer-for-time-series-forecasting-69e073d4061e
-
     In cases where the paper does not specify what value was used for a specific
     configuration/hyperparameter, this class uses the values from Vaswani et al
     (2017) [2] or from PyTorch source code.
@@ -88,12 +84,12 @@ class TimeSeriesTransformer(nn.Module):
     'Deep Transformer Models for Time Series Forecasting: 
     The Influenza Prevalence Case'. 
     arXiv:2001.08317 [cs, stat] [Preprint]. 
-    Available at: http://arxiv.org/abs/2001.08317 (Accessed: 9 March 2022).
+    Available at: http://arxiv.org/abs/2001.08317 (Accessed: 1 December 2023).
 
     [2] Vaswani, A. et al. (2017) 
     'Attention Is All You Need'.
     arXiv:1706.03762 [cs] [Preprint]. 
-    Available at: http://arxiv.org/abs/1706.03762 (Accessed: 9 March 2022).
+    Available at: http://arxiv.org/abs/1706.03762 (Accessed: 1 December 2023).
     """
     
     def __init__(self, input_size: int, decoder_sequence_len: int, batch_first: bool,
