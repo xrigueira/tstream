@@ -23,6 +23,9 @@ import main as mn
 
 init_notebook_plotting()
 
+# Define seed
+torch.manual_seed(0)
+
 # Hyperparams
 test_size = 0.2
 batch_size = 128
@@ -117,7 +120,7 @@ ax_client.create_experiment(
         {
             "name": "lr",  # The name of the parameter.
             "type": "range",  # The type of the parameter ("range", "choice" or "fixed").
-            "bounds": [1e-6, 0.01],  # The bounds for range parameters. 
+            "bounds": [1e-5, 0.001],  # The bounds for range parameters. 
             # "values" The possible values for choice parameters .
             # "value" The fixed value for fixed parameters.
             "value_type": "float",  # Optional, the value type ("int", "float", "bool" or "str"). Defaults to inference from type of "bounds".
@@ -198,7 +201,7 @@ def train_test_infer(parameterization):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
     # Update model in the training process and test it
-    epochs = 25
+    epochs = 180
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
@@ -217,7 +220,7 @@ def train_test_infer(parameterization):
 # Run optimization loop
 # Attach the trial
 ax_client.attach_trial(
-    parameters={"lr": 0.000026, "d_model": 32, "n_heads": 2, "n_encoder_layers": 1, "n_decoder_layers": 1,
+    parameters={"lr": 0.00001, "d_model": 32, "n_heads": 2, "n_encoder_layers": 1, "n_decoder_layers": 1,
                 "in_features_encoder_linear_layer": 32, "in_features_decoder_linear_layer": 32}
 )
 
@@ -225,7 +228,7 @@ ax_client.attach_trial(
 baseline_parameters = ax_client.get_trial_parameters(trial_index=0)
 ax_client.complete_trial(trial_index=0, raw_data=train_test_infer(baseline_parameters))
 
-for i in range(110):
+for i in range(100):
     parameters, trial_index = ax_client.get_next_trial()
     # Local evaluation here can be replaced with deployment to external system.
     ax_client.complete_trial(trial_index=trial_index, raw_data=train_test_infer(parameters))

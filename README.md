@@ -1,2 +1,2 @@
 # tstream
- Using transformers to predict stream flow from meteorological data.
+ Using transformers to model stream flow from meteorological data.

@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
+from prettytable import PrettyTable
 
 import torch
 import torch.nn as nn
@@ -96,6 +97,23 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
     
     return tgt_y_truth, tgt_y_truth_train, tgt_y_truth_test, tgt_y_hat, tgt_y_hat_train, tgt_y_hat_test
 
+# Define function to get and format the number of parameters
+def count_parameters(model):
+    table = PrettyTable(["Modules", "Parameters"])
+    total_params = 0
+    
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        params = parameter.numel()
+        table.add_row([name, params])
+        total_params += params
+    
+    print(table)
+    print(f"Total trainable parameters: {total_params}")
+    
+    return total_params
+
 # Define Nash-Sutcliffe efficiency
 def nash_sutcliffe_efficiency(observed, modeled):
     mean_observed = np.mean(observed)
@@ -107,6 +125,9 @@ def nash_sutcliffe_efficiency(observed, modeled):
     return nse
 
 if __name__ == '__main__':
+    
+    # Define seed
+    torch.manual_seed(0)
     
     # Hyperparams
     test_size = 0.2
@@ -174,7 +195,7 @@ if __name__ == '__main__':
     training_data = DataLoader(training_data, batch_size, shuffle=True)
     testing_data = DataLoader(testing_data, batch_size, shuffle=True)
     inference_data = DataLoader(inference_data, batch_size=1)
-
+    
     # Update the encoder sequence length to its crushed version
     encoder_sequence_len = crushed_encoder_sequence_len
 
@@ -184,21 +205,25 @@ if __name__ == '__main__':
                                     n_decoder_layers=n_decoder_layers, n_heads=n_heads, dropout_encoder=0.2, 
                                     dropout_decoder=0.2, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
                                     dim_feedforward_decoder=in_features_decoder_linear_layer, num_predicted_features=len(tgt_variables)).to(device)
-
+    
+    # Print model and number of parameters
+    print('Defined model:\n', model)
+    count_parameters(model)
+    
     # Make src mask for the decoder with size
     # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
     src_mask = utils.masker(dim1=output_sequence_length, dim2=encoder_sequence_len).to(device)
-
+    
     # Make tgt mask for decoder with size
     # [batch_size*n_heads, output_sequence_length, output_sequence_length]
     tgt_mask = utils.masker(dim1=output_sequence_length, dim2=output_sequence_length).to(device)
-
+    
     # Define optimizer and loss function
     loss_function = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     # Update model in the training process and test it
-    epochs = 5
+    epochs = 250
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
@@ -223,6 +248,7 @@ if __name__ == '__main__':
     plt.figure(1);plt.clf()
     plt.plot(df_training['epoch'], df_training['loss_train'], '-o', label='loss train')
     plt.plot(df_training['epoch'], df_testing['loss_test'], '-o', label='loss test')
+    plt.yscale('log')
     plt.xlabel(r'epoch')
     plt.ylabel(r'loss')
     plt.legend()
