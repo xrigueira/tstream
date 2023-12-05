@@ -34,18 +34,18 @@ timestamp_col_name = "time"
 # Only use data from this date and onwards
 cutoff_date = datetime.datetime(1980, 1, 1)
 
-d_model = 32
+# d_model = 32
 # n_heads = 2
-n_decoder_layers = 1
-n_encoder_layers = 1
+# n_encoder_layers = 1
+# n_decoder_layers = 1
 encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
 crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset 53
 decoder_sequence_len = 1 # length of input given to decoder
 output_sequence_length = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
 window_size = encoder_sequence_len + output_sequence_length # used to slice data into sub-sequences
 step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
-in_features_encoder_linear_layer = 32
-in_features_decoder_linear_layer = 32
+# in_features_encoder_linear_layer = 32
+# in_features_decoder_linear_layer = 32
 max_sequence_len = encoder_sequence_len
 batch_first = True
 
@@ -125,12 +125,47 @@ ax_client.create_experiment(
             # "is_ordered" Optional, a flag for choice parameters.
         },
         {
-            "name": "n_heads",
+            "name": "d_model",
             "type": "choice",
-            "values": [2, 4, 6, 8],
+            "values": [32, 64, 128, 256, 512],
             "value_type": "int",
             "log_scale": False,
-        }
+        },
+        {
+            "name": "n_heads",
+            "type": "choice",
+            "values": [2, 4, 8],
+            "value_type": "int",
+            "log_scale": False,
+        },
+        {
+            "name": "n_encoder_layers",
+            "type": "choice",
+            "values": [1, 2, 4],
+            "value_type": "int",
+            "log_scale": False,
+        },
+        {
+            "name": "n_decoder_layers",
+            "type": "choice",
+            "values": [1, 2, 4],
+            "value_type": "int",
+            "log_scale": False,
+        },
+        {
+            "name": "in_features_encoder_linear_layer",
+            "type": "choice",
+            "values": [32, 64, 128],
+            "value_type": "int",
+            "log_scale": False,
+        },
+        {
+            "name": "in_features_decoder_linear_layer",
+            "type": "choice",
+            "values": [32, 64, 128],
+            "value_type": "int",
+            "log_scale": False,
+        },
         
     ],
     
@@ -144,7 +179,12 @@ def train_test_infer(parameterization):
     
     # Extract hyperparameters
     lr = parameterization["lr"]
+    d_model = parameterization["d_model"]
     n_heads = parameterization["n_heads"]
+    n_encoder_layers = parameterization["n_encoder_layers"]
+    n_decoder_layers = parameterization["n_decoder_layers"]
+    in_features_encoder_linear_layer = parameterization["in_features_encoder_linear_layer"]
+    in_features_decoder_linear_layer = parameterization["in_features_decoder_linear_layer"]
     
     # Instantiate the transformer model and send it to device
     model = tst.TimeSeriesTransformer(input_size=len(src_variables), decoder_sequence_len=decoder_sequence_len, 
@@ -158,7 +198,7 @@ def train_test_infer(parameterization):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
     # Update model in the training process and test it
-    epochs = 2
+    epochs = 30
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
@@ -177,14 +217,15 @@ def train_test_infer(parameterization):
 # Run optimization loop
 # Attach the trial
 ax_client.attach_trial(
-    parameters={"lr": 0.000026, "n_heads": 2}
+    parameters={"lr": 0.000026, "d_model": 32, "n_heads": 2, "n_encoder_layers": 1, "n_decoder_layers": 1,
+                "in_features_encoder_linear_layer": 32, "in_features_decoder_linear_layer": 32}
 )
 
 # Get the parameters and run the trial 
 baseline_parameters = ax_client.get_trial_parameters(trial_index=0)
 ax_client.complete_trial(trial_index=0, raw_data=train_test_infer(baseline_parameters))
 
-for i in range(25):
+for i in range(110):
     parameters, trial_index = ax_client.get_next_trial()
     # Local evaluation here can be replaced with deployment to external system.
     ax_client.complete_trial(trial_index=trial_index, raw_data=train_test_infer(parameters))
