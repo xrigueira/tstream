@@ -198,7 +198,7 @@ def train_test_infer(parameterization):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
     # Update model in the training process and test it
-    epochs = 30
+    epochs = 25
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
@@ -235,6 +235,7 @@ ax_client.get_max_parallelism()
 
 # Retrieve best parameters
 best_parameters, values = ax_client.get_best_parameters()
+np.save('best_parameters.npy', best_parameters)
 print(best_parameters)
 
 mean, covariance = values
