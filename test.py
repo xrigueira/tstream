@@ -11,9 +11,8 @@ tgt_y_hat = np.load('tgt_y_hat.npy', allow_pickle=False, fix_imports=False)
 tgt_y_truth_train, tgt_y_truth_test = tgt_y_truth[:-(round(len(tgt_y_truth)*test_size))], tgt_y_truth[(round(len(tgt_y_truth)*(1-test_size))):]
 tgt_y_hat_train, tgt_y_hat_test = tgt_y_hat[:-(round(len(tgt_y_truth)*test_size))], tgt_y_hat[(round(len(tgt_y_truth)*(1-test_size))):]
 
-import numpy as np
-
 def nash_sutcliffe_efficiency(observed, modeled):
+    
     mean_observed = np.mean(observed)
     numerator = np.sum((observed - modeled)**2)
     denominator = np.sum((observed - mean_observed)**2)
