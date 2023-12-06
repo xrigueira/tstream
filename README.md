@@ -222,13 +222,13 @@
 
             return make_causal
 
- Additionally, the type hint type <code>Tuple</code> has to be added in the second line of the file and the class name <code>AttentionWeightsTransformerDecoderLayer</code> has to be included in the <code>__all__</code> statement.
+ Additionally, the type hint type <code>Tuple</code> has to be added in the second line of the <code>torch.nn.modules.transformer.py</code> file and the class name <code>AttentionWeightsTransformerDecoderLayer</code> has to be included in the <code>__all__</code> statement.
         
         from typing import Optional, Any, Union, Callable, Tuple
 
         __all__ = ['Transformer', 'TransformerEncoder', 'TransformerDecoder', 'TransformerEncoderLayer', 'TransformerDecoderLayer', 'AttentionWeightsTransformerDecoderLayer']
 
- Lastly, the <code>torch.nn.modules.__init__.py</> file was modified accordingly. In particular, the class name has to be added to the <code>__all__</code> statement.
+ Lastly, the <code>torch.nn.modules.__init__.py</code> file was modified accordingly. In particular, the class name has to be added to the <code>__all__</code> statement.
     
             __all__ = [
             'Module', 'Identity', 'Linear', 'Conv1d', 'Conv2d', 'Conv3d', 'ConvTranspose1d',
