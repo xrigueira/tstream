@@ -7,13 +7,13 @@
  1. Added AttentionWeightsTransformerDecoderLayer class to the torch.nn.modules.transformer.py file.
  This class is based on the original TransformerDecoderLayer but it has been customized to return the attention weights. Here is the code added.
     
-    class AttentionWeightsTransformerDecoderLayer(Module):
-        r"""TransformerDecoderLayer is made up of self-attn, multi-head-attn and feedforward network.
-        This standard decoder layer is based on the paper "Attention Is All You Need".
-        Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
-        Lukasz Kaiser, and Illia Polosukhin. 2017. Attention is all you need. In Advances in
-        Neural Information Processing Systems, pages 6000-6010. Users may modify or implement
-        in a different way during application.
+        class AttentionWeightsTransformerDecoderLayer(Module):
+            r"""TransformerDecoderLayer is made up of self-attn, multi-head-attn and feedforward network.
+            This standard decoder layer is based on the paper "Attention Is All You Need".
+            Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
+            Lukasz Kaiser, and Illia Polosukhin. 2017. Attention is all you need. In Advances in
+            Neural Information Processing Systems, pages 6000-6010. Users may modify or implement
+            in a different way during application.
 
         Args:
             d_model: the number of expected features in the input (required).
