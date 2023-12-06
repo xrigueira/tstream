@@ -1,11 +1,9 @@
 import time
 import datetime
-import statistics
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
-from prettytable import PrettyTable
 
 import torch
 import torch.nn as nn
@@ -28,7 +26,8 @@ def train(dataloader, model, src_mask, tgt_mask, loss_function, optimizer, devic
         optimizer.zero_grad()
         
         # Compute prediction error
-        pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask).to(device)
+        pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+        pred = pred.to(device)
         loss = loss_function(pred, tgt_y)
         
         # Backpropagation
@@ -55,7 +54,8 @@ def test(dataloader, model, src_mask, tgt_mask, loss_function, device, df_testin
             src, tgt, tgt_y = batch
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
             
-            pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask).to(device)
+            pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+            pred = pred.to(device)
             loss = loss_function(pred, tgt_y.unsqueeze(2))
             
             # Save results for plotting
@@ -83,7 +83,8 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
             src, tgt, tgt_y = sample
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
 
-            pred = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask).to(device)
+            pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+            pred = pred.to(device)
             # print(pred, tgt_y)
             tgt_y_hat[i] = pred
 
@@ -96,33 +97,6 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
     # np.save('tgt_y_hat.npy', tgt_y_hat, allow_pickle=False, fix_imports=False)
     
     return tgt_y_truth, tgt_y_truth_train, tgt_y_truth_test, tgt_y_hat, tgt_y_hat_train, tgt_y_hat_test
-
-# Define function to get and format the number of parameters
-def count_parameters(model):
-    table = PrettyTable(["Modules", "Parameters"])
-    total_params = 0
-    
-    for name, parameter in model.named_parameters():
-        if not parameter.requires_grad:
-            continue
-        params = parameter.numel()
-        table.add_row([name, params])
-        total_params += params
-    
-    print(table)
-    print(f"Total trainable parameters: {total_params}")
-    
-    return total_params
-
-# Define Nash-Sutcliffe efficiency
-def nash_sutcliffe_efficiency(observed, modeled):
-    mean_observed = np.mean(observed)
-    numerator = np.sum((observed - modeled)**2)
-    denominator = np.sum((observed - mean_observed)**2)
-    
-    nse = 1 - (numerator / denominator)
-    
-    return nse
 
 if __name__ == '__main__':
     
@@ -205,10 +179,12 @@ if __name__ == '__main__':
                                     n_decoder_layers=n_decoder_layers, n_heads=n_heads, dropout_encoder=0.2, 
                                     dropout_decoder=0.2, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
                                     dim_feedforward_decoder=in_features_decoder_linear_layer, num_predicted_features=len(tgt_variables)).to(device)
+    # Send model to device
+    model.to(device)
     
     # Print model and number of parameters
     print('Defined model:\n', model)
-    count_parameters(model)
+    utils.count_parameters(model)
     
     # Make src mask for the decoder with size
     # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
@@ -223,7 +199,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     # Update model in the training process and test it
-    epochs = 250
+    epochs = 2 # 250
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
@@ -267,13 +243,13 @@ if __name__ == '__main__':
     # Metrics
     from sklearn.metrics import mean_squared_error
 
-    nse_train = nash_sutcliffe_efficiency(tgt_y_truth_train, tgt_y_hat_train)
+    nse_train = utils.nash_sutcliffe_efficiency(tgt_y_truth_train, tgt_y_hat_train)
     mse_train = mean_squared_error(tgt_y_truth_train, tgt_y_hat_train)
     print('-- training result ')
     print('NSE = ', nse_train)
     print('MSE = ', mse_train)
 
-    nse_test = nash_sutcliffe_efficiency(tgt_y_truth_test, tgt_y_hat_test)
+    nse_test = utils.nash_sutcliffe_efficiency(tgt_y_truth_test, tgt_y_hat_test)
     mse_test = mean_squared_error(tgt_y_truth_test, tgt_y_hat_test)
     print('\n-- test result ')
     print('NSE = ', nse_test)

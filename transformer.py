@@ -140,7 +140,7 @@ class TimeSeriesTransformer(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=n_encoder_layers, norm=None)
         
         # Define the decoder layer
-        decoder_layer = nn.TransformerDecoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward_decoder,
+        decoder_layer = nn.AttentionWeightsTransformerDecoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward_decoder,
                                                 dropout=dropout_decoder, batch_first=batch_first)
         
         # Stack the decoder layers in nn.TransformerDecoder
@@ -198,7 +198,7 @@ class TimeSeriesTransformer(nn.Module):
         
         # Pass through the decoder
         # Output shape: [batch_size, target seq len, d_model]
-        decoder_output = self.decoder(tgt=decoder_output, memory=src, tgt_mask=tgt_mask, memory_mask=src_mask)
+        decoder_output, sa_weights, mha_weights = self.decoder(tgt=decoder_output, memory=src, tgt_mask=tgt_mask, memory_mask=src_mask)
         # print("From model.forward(): decoder_output shape after decoder: {}".format(decoder_output.shape))
         
         # Pass through the linear mapping
@@ -206,4 +206,4 @@ class TimeSeriesTransformer(nn.Module):
         decoder_output = self.linear_mapping(decoder_output)
         # print("From model.forward(): decoder_output size after linear_mapping = {}".format(decoder_output.size()))
         
-        return decoder_output
+        return decoder_output, sa_weights, mha_weights

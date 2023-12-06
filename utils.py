@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+from prettytable import PrettyTable
 
 import torch
 import torch.nn as nn
@@ -141,3 +142,30 @@ def to_numeric_and_downcast_data(df: pd.DataFrame):
     df[icols] = df[icols].apply(pd.to_numeric, downcast='integer')
 
     return df
+
+# Define function to get and format the number of parameters
+def count_parameters(model):
+    table = PrettyTable(["Modules", "Parameters"])
+    total_params = 0
+    
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        params = parameter.numel()
+        table.add_row([name, params])
+        total_params += params
+    
+    print(table)
+    print(f"Total trainable parameters: {total_params}")
+    
+    return total_params
+
+# Define Nash-Sutcliffe efficiency
+def nash_sutcliffe_efficiency(observed, modeled):
+    mean_observed = np.mean(observed)
+    numerator = np.sum((observed - modeled)**2)
+    denominator = np.sum((observed - mean_observed)**2)
+    
+    nse = 1 - (numerator / denominator)
+    
+    return nse
