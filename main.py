@@ -20,7 +20,7 @@ def train(dataloader, model, src_mask, tgt_mask, loss_function, optimizer, devic
     training_loss = [] # For plotting purposes
     for i, batch in enumerate(dataloader):
         src, tgt, tgt_y = batch
-        src, tgt, tgt_y = src.to(device), tgt.to(device), tgt.to(device)
+        src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
 
         # Zero out gradients for every batch
         optimizer.zero_grad()
@@ -28,7 +28,7 @@ def train(dataloader, model, src_mask, tgt_mask, loss_function, optimizer, devic
         # Compute prediction error
         pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
         pred = pred.to(device)
-        loss = loss_function(pred, tgt_y)
+        loss = loss_function(pred, tgt_y.unsqueeze(2))
         
         # Backpropagation
         loss.backward()
@@ -76,6 +76,9 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
     # Define tensor to store the predictions
     tgt_y_hat = torch.zeros((len(inference_data)), device=device)
 
+    # Define list to store the multi-head self attention weights
+    all_mha_weights_inference = []
+    
     # Perform inference
     model.eval()
     with torch.no_grad():
@@ -84,10 +87,15 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
 
             pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+            all_mha_weights_inference.append(mha_weights)
             pred = pred.to(device)
             # print(pred, tgt_y)
             tgt_y_hat[i] = pred
 
+    # Save inference attention for the last step
+    # np.save('sa_weights.npy', sa_weights, allow_pickle=False, fix_imports=False)
+    np.save('all_mha_weights.npy', all_mha_weights_inference, allow_pickle=False, fix_imports=False)
+    
     # Pass target_y_hat to cpu for plotting purposes
     tgt_y_hat = tgt_y_hat.cpu()
 
@@ -199,7 +207,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     # Update model in the training process and test it
-    epochs = 2 # 250
+    epochs = 10 # 250
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
