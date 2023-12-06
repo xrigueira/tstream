@@ -56,6 +56,7 @@ def test(dataloader, model, src_mask, tgt_mask, loss_function, device, df_testin
             
             pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
             pred = pred.to(device)
+            print(mha_weights)
             loss = loss_function(pred, tgt_y.unsqueeze(2))
             
             # Save results for plotting
@@ -77,6 +78,7 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
     tgt_y_hat = torch.zeros((len(inference_data)), device=device)
 
     # Define list to store the multi-head self attention weights
+    all_sa_weights_inference = []
     all_mha_weights_inference = []
     
     # Perform inference
@@ -87,13 +89,14 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
 
             pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+            all_sa_weights_inference.append(sa_weights)
             all_mha_weights_inference.append(mha_weights)
             pred = pred.to(device)
             # print(pred, tgt_y)
             tgt_y_hat[i] = pred
 
     # Save inference attention for the last step
-    # np.save('sa_weights.npy', sa_weights, allow_pickle=False, fix_imports=False)
+    np.save('all_sa_weights.npy', all_sa_weights_inference, allow_pickle=False, fix_imports=False)
     np.save('all_mha_weights.npy', all_mha_weights_inference, allow_pickle=False, fix_imports=False)
     
     # Pass target_y_hat to cpu for plotting purposes
