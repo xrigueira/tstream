@@ -4,8 +4,7 @@
 ## PyTorch changes to extract attention weights
  In order to be able to extract the attention weights from the decoder I have done some changes to the <code>torch.nn</code> module.
 
- 1. Added <code>AttentionWeightsTransformerDecoderLayer</code> class to the <code>torch.nn.modules.transformer.py</code> file.
- This class is based on the original <code>TransformerDecoderLayer</code> but it has been customized to return the attention weights. Here is the code added.
+ 1. Added <code>AttentionWeightsTransformerDecoderLayer</code> class to the <code>torch.nn.modules.transformer.py</code> file. This class is based on the original <code>TransformerDecoderLayer</code> but it has been customized to return the attention weights. Here is the code added.
     
         class AttentionWeightsTransformerDecoderLayer(Module):
             r"""TransformerDecoderLayer is made up of self-attn, multi-head-attn and feedforward network.
@@ -217,41 +216,51 @@
                     make_causal = False
 
             return make_causal
+ 
+ 2. The <code>__init__</code> method of the <code>TransformerDecoder</code> class has been changes to add the new as the last layer. If this was not changes and the used would like to use several decoder layers, the first layer would pass the attention matrix but also the sa_weights and mhe_weights to the following layer causing a error. This way all the layers are conventional decoder layers but the last one which uses the new class to return the weights.
+        
+            def __init__(self, decoder_layer, num_layers, decoder_layer_attention_weights, num_layers_attention_weights, norm=None):
+                super().__init__()
+                torch._C._log_api_usage_once(f"torch.nn.modules.{self.__class__.__name__}")
+                self.layers = _get_clones(decoder_layer, num_layers) + _get_clones(decoder_layer_attention_weights, num_layers_attention_weights)
+                self.num_layers = num_layers
+                self.num_layers_attention_weights = num_layers_attention_weights
+                self.norm = norm
 
- 2. the type hint type <code>Tuple</code> has to be added in the second line of the <code>torch.nn.modules.transformer.py</code> file and the class name <code>AttentionWeightsTransformerDecoderLayer</code> has to be included in the <code>__all__</code> statement.
+ 3. The type hint type <code>Tuple</code> has to be added in the second line of the <code>torch.nn.modules.transformer.py</code> file and the class name <code>AttentionWeightsTransformerDecoderLayer</code> has to be included in the <code>__all__</code> statement.
         
         from typing import Optional, Any, Union, Callable, Tuple
 
         __all__ = ['Transformer', 'TransformerEncoder', 'TransformerDecoder', 'TransformerEncoderLayer', 'TransformerDecoderLayer', 'AttentionWeightsTransformerDecoderLayer']
 
- 3. the <code>torch.nn.modules.__init__.py</code> file was modified accordingly. In particular, the class name has to be added to the <code>__all__</code> statement.
+ 4. the <code>torch.nn.modules.__init__.py</code> file was modified accordingly. In particular, the class name has to be added to the <code>__all__</code> statement.
     
             __all__ = [
-            'Module', 'Identity', 'Linear', 'Conv1d', 'Conv2d', 'Conv3d', 'ConvTranspose1d',
-            'ConvTranspose2d', 'ConvTranspose3d', 'Threshold', 'ReLU', 'Hardtanh', 'ReLU6',
-            'Sigmoid', 'Tanh', 'Softmax', 'Softmax2d', 'LogSoftmax', 'ELU', 'SELU', 'CELU', 'GLU', 'GELU', 'Hardshrink',
-            'LeakyReLU', 'LogSigmoid', 'Softplus', 'Softshrink', 'MultiheadAttention', 'PReLU', 'Softsign', 'Softmin',
-            'Tanhshrink', 'RReLU', 'L1Loss', 'NLLLoss', 'KLDivLoss', 'MSELoss', 'BCELoss', 'BCEWithLogitsLoss',
-            'NLLLoss2d', 'PoissonNLLLoss', 'CosineEmbeddingLoss', 'CTCLoss', 'HingeEmbeddingLoss', 'MarginRankingLoss',
-            'MultiLabelMarginLoss', 'MultiLabelSoftMarginLoss', 'MultiMarginLoss', 'SmoothL1Loss', 'GaussianNLLLoss',
-            'HuberLoss', 'SoftMarginLoss', 'CrossEntropyLoss', 'Container', 'Sequential', 'ModuleList', 'ModuleDict',
-            'ParameterList', 'ParameterDict', 'AvgPool1d', 'AvgPool2d', 'AvgPool3d', 'MaxPool1d', 'MaxPool2d',
-            'MaxPool3d', 'MaxUnpool1d', 'MaxUnpool2d', 'MaxUnpool3d', 'FractionalMaxPool2d', "FractionalMaxPool3d",
-            'LPPool1d', 'LPPool2d', 'LocalResponseNorm', 'BatchNorm1d', 'BatchNorm2d', 'BatchNorm3d', 'InstanceNorm1d',
-            'InstanceNorm2d', 'InstanceNorm3d', 'LayerNorm', 'GroupNorm', 'SyncBatchNorm',
-            'Dropout', 'Dropout1d', 'Dropout2d', 'Dropout3d', 'AlphaDropout', 'FeatureAlphaDropout',
-            'ReflectionPad1d', 'ReflectionPad2d', 'ReflectionPad3d', 'ReplicationPad2d', 'ReplicationPad1d', 'ReplicationPad3d',
-            'CrossMapLRN2d', 'Embedding', 'EmbeddingBag', 'RNNBase', 'RNN', 'LSTM', 'GRU', 'RNNCellBase', 'RNNCell',
-            'LSTMCell', 'GRUCell', 'PixelShuffle', 'PixelUnshuffle', 'Upsample', 'UpsamplingNearest2d', 'UpsamplingBilinear2d',
-            'PairwiseDistance', 'AdaptiveMaxPool1d', 'AdaptiveMaxPool2d', 'AdaptiveMaxPool3d', 'AdaptiveAvgPool1d',
-            'AdaptiveAvgPool2d', 'AdaptiveAvgPool3d', 'TripletMarginLoss', 'ZeroPad1d', 'ZeroPad2d', 'ZeroPad3d',
-            'ConstantPad1d', 'ConstantPad2d', 'ConstantPad3d', 'Bilinear', 'CosineSimilarity', 'Unfold', 'Fold',
-            'AdaptiveLogSoftmaxWithLoss', 'TransformerEncoder', 'TransformerDecoder',
-            'TransformerEncoderLayer', 'TransformerDecoderLayer', 'AttentionWeightsTransformerDecoderLayer', 'Transformer',
-            'LazyLinear', 'LazyConv1d', 'LazyConv2d', 'LazyConv3d',
-            'LazyConvTranspose1d', 'LazyConvTranspose2d', 'LazyConvTranspose3d',
-            'LazyBatchNorm1d', 'LazyBatchNorm2d', 'LazyBatchNorm3d',
-            'LazyInstanceNorm1d', 'LazyInstanceNorm2d', 'LazyInstanceNorm3d',
-            'Flatten', 'Unflatten', 'Hardsigmoid', 'Hardswish', 'SiLU', 'Mish', 'TripletMarginWithDistanceLoss', 'ChannelShuffle',
-            'CircularPad1d', 'CircularPad2d', 'CircularPad3d'
-        ]
+                'Module', 'Identity', 'Linear', 'Conv1d', 'Conv2d', 'Conv3d', 'ConvTranspose1d',
+                'ConvTranspose2d', 'ConvTranspose3d', 'Threshold', 'ReLU', 'Hardtanh', 'ReLU6',
+                'Sigmoid', 'Tanh', 'Softmax', 'Softmax2d', 'LogSoftmax', 'ELU', 'SELU', 'CELU', 'GLU', 'GELU', 'Hardshrink',
+                'LeakyReLU', 'LogSigmoid', 'Softplus', 'Softshrink', 'MultiheadAttention', 'PReLU', 'Softsign', 'Softmin',
+                'Tanhshrink', 'RReLU', 'L1Loss', 'NLLLoss', 'KLDivLoss', 'MSELoss', 'BCELoss', 'BCEWithLogitsLoss',
+                'NLLLoss2d', 'PoissonNLLLoss', 'CosineEmbeddingLoss', 'CTCLoss', 'HingeEmbeddingLoss', 'MarginRankingLoss',
+                'MultiLabelMarginLoss', 'MultiLabelSoftMarginLoss', 'MultiMarginLoss', 'SmoothL1Loss', 'GaussianNLLLoss',
+                'HuberLoss', 'SoftMarginLoss', 'CrossEntropyLoss', 'Container', 'Sequential', 'ModuleList', 'ModuleDict',
+                'ParameterList', 'ParameterDict', 'AvgPool1d', 'AvgPool2d', 'AvgPool3d', 'MaxPool1d', 'MaxPool2d',
+                'MaxPool3d', 'MaxUnpool1d', 'MaxUnpool2d', 'MaxUnpool3d', 'FractionalMaxPool2d', "FractionalMaxPool3d",
+                'LPPool1d', 'LPPool2d', 'LocalResponseNorm', 'BatchNorm1d', 'BatchNorm2d', 'BatchNorm3d', 'InstanceNorm1d',
+                'InstanceNorm2d', 'InstanceNorm3d', 'LayerNorm', 'GroupNorm', 'SyncBatchNorm',
+                'Dropout', 'Dropout1d', 'Dropout2d', 'Dropout3d', 'AlphaDropout', 'FeatureAlphaDropout',
+                'ReflectionPad1d', 'ReflectionPad2d', 'ReflectionPad3d', 'ReplicationPad2d', 'ReplicationPad1d', 'ReplicationPad3d',
+                'CrossMapLRN2d', 'Embedding', 'EmbeddingBag', 'RNNBase', 'RNN', 'LSTM', 'GRU', 'RNNCellBase', 'RNNCell',
+                'LSTMCell', 'GRUCell', 'PixelShuffle', 'PixelUnshuffle', 'Upsample', 'UpsamplingNearest2d', 'UpsamplingBilinear2d',
+                'PairwiseDistance', 'AdaptiveMaxPool1d', 'AdaptiveMaxPool2d', 'AdaptiveMaxPool3d', 'AdaptiveAvgPool1d',
+                'AdaptiveAvgPool2d', 'AdaptiveAvgPool3d', 'TripletMarginLoss', 'ZeroPad1d', 'ZeroPad2d', 'ZeroPad3d',
+                'ConstantPad1d', 'ConstantPad2d', 'ConstantPad3d', 'Bilinear', 'CosineSimilarity', 'Unfold', 'Fold',
+                'AdaptiveLogSoftmaxWithLoss', 'TransformerEncoder', 'TransformerDecoder',
+                'TransformerEncoderLayer', 'TransformerDecoderLayer', 'AttentionWeightsTransformerDecoderLayer', 'Transformer',
+                'LazyLinear', 'LazyConv1d', 'LazyConv2d', 'LazyConv3d',
+                'LazyConvTranspose1d', 'LazyConvTranspose2d', 'LazyConvTranspose3d',
+                'LazyBatchNorm1d', 'LazyBatchNorm2d', 'LazyBatchNorm3d',
+                'LazyInstanceNorm1d', 'LazyInstanceNorm2d', 'LazyInstanceNorm3d',
+                'Flatten', 'Unflatten', 'Hardsigmoid', 'Hardswish', 'SiLU', 'Mish', 'TripletMarginWithDistanceLoss', 'ChannelShuffle',
+                'CircularPad1d', 'CircularPad2d', 'CircularPad3d'
+            ]

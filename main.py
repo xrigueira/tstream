@@ -127,7 +127,7 @@ if __name__ == '__main__':
 
     d_model = 32
     n_heads = 2
-    n_decoder_layers = 1
+    n_decoder_layers = 0 # Remember that with the current implementation it always has a decoder layer that returns the weights
     n_encoder_layers = 1
     encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
     crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset 53

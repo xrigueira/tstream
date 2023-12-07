@@ -140,11 +140,15 @@ class TimeSeriesTransformer(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=n_encoder_layers, norm=None)
         
         # Define the decoder layer
-        decoder_layer = nn.AttentionWeightsTransformerDecoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward_decoder,
+        decoder_layer = nn.TransformerDecoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward_decoder,
+                                                dropout=dropout_decoder, batch_first=batch_first)
+        
+        # Define the last decoder layer that returns the attention weights
+        decoder_layer_attention_weights = nn.AttentionWeightsTransformerDecoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward_decoder,
                                                 dropout=dropout_decoder, batch_first=batch_first)
         
         # Stack the decoder layers in nn.TransformerDecoder
-        self.decoder = nn.TransformerDecoder(decoder_layer=decoder_layer, num_layers=n_decoder_layers, norm=None)
+        self.decoder = nn.TransformerDecoder(decoder_layer=decoder_layer, num_layers=n_decoder_layers, decoder_layer_attention_weights=decoder_layer_attention_weights, num_layers_attention_weights=1, norm=None)
         
     def forward(self, src: Tensor, tgt: Tensor, src_mask: Tensor=None, tgt_mask: Tensor=None) -> Tensor:
         
