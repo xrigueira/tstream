@@ -217,7 +217,7 @@
 
             return make_causal
  
- 2. The <code>__init__</code> method of the <code>TransformerDecoder</code> class has been changes to add the new as the last layer. If this was not changes and the used would like to use several decoder layers, the first layer would pass the attention matrix but also the sa_weights and mhe_weights to the following layer causing a error. This way all the layers are conventional decoder layers but the last one which uses the new class to return the weights.
+ 2. The <code>__init__</code> method of the <code>TransformerDecoder</code> class has been changed to add the new <code>AttentionWeightsTransformerDecoderLayer</code> class as the last layer. If this was not changed and the user would like to use several decoder layers, the first layer would pass the attention matrix and also the sa_weights and mhe_weights to the following layer causing a error because it is only supposed to pass the attention matrix. This way all the layers are conventional decoder layers but the last one which uses the new class to return the weights.
         
             def __init__(self, decoder_layer, num_layers, decoder_layer_attention_weights, num_layers_attention_weights, norm=None):
                 super().__init__()
@@ -233,7 +233,7 @@
 
         __all__ = ['Transformer', 'TransformerEncoder', 'TransformerDecoder', 'TransformerEncoderLayer', 'TransformerDecoderLayer', 'AttentionWeightsTransformerDecoderLayer']
 
- 4. the <code>torch.nn.modules.__init__.py</code> file was modified accordingly. In particular, the class name has to be added to the <code>__all__</code> statement.
+ 4. the <code>torch.nn.modules.__init__.py</code> file was modified accordingly. In particular, the class name <code>AttentionWeightsTransformerDecoderLayer</code> has to be added to the <code>__all__</code> statement.
     
             __all__ = [
                 'Module', 'Identity', 'Linear', 'Conv1d', 'Conv2d', 'Conv3d', 'ConvTranspose1d',
