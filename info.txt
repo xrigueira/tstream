@@ -53,3 +53,9 @@ https://deepgram.com/learn/visualizing-and-explaining-transformer-models-from-th
 https://www.youtube.com/watch?v=4Bdc55j80l8&ab_channel=TheA.I.Hacker-MichaelPhi
 https://www.youtube.com/watch?v=XSSTuhyAmnI&list=WL&index=22&ab_channel=AriSeff
 https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html
+
+Structure paper. Once I have fine-tuned the vanilla transformer, we will use it as a benchmark
+and compare it with the Autoformer and FEDformer. I will compare the weights from predicting with 
+just SWIT and with SWIT and PET. Tianfang has mentioned that if we use only SWIT, it pays attention
+to the most recent data, while if we include PET in the data it pays more attention to past data 
+because PET has a longer cycle.
