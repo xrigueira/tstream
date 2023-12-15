@@ -172,10 +172,10 @@ if __name__ == '__main__':
     testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variables].values).float(),
                                         indices=testing_indices, encoder_sequence_len=encoder_sequence_len, 
                                         decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
-
+    
     # Define data for inference
     inference_data = training_data + testing_data
-
+    
     # Set up dataloaders
     training_data = DataLoader(training_data, batch_size, shuffle=True)
     testing_data = DataLoader(testing_data, batch_size, shuffle=True)
