@@ -98,14 +98,16 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
             tgt_y_hat[i] = pred
 
     # Save inference attention for the last step
-    np.save('all_sa_weights.npy', [sa_weight.cpu() for sa_weight in all_sa_weights_inference], allow_pickle=False, fix_imports=False)
-    np.save('all_mha_weights.npy', [mha_weight.cpu() for mha_weight in all_mha_weights_inference], allow_pickle=False, fix_imports=False)
+    # np.save('all_sa_weights.npy', [sa_weight.cpu() for sa_weight in all_sa_weights_inference], allow_pickle=False, fix_imports=False)
+    # np.save('all_mha_weights.npy', [mha_weight.cpu() for mha_weight in all_mha_weights_inference], allow_pickle=False, fix_imports=False)
     
     # Pass target_y_hat to cpu for plotting purposes
     tgt_y_hat = tgt_y_hat.cpu()
 
     tgt_y_truth_train, tgt_y_truth_test = tgt_y_truth[:-(round(len(tgt_y_truth)*test_size))].numpy(), tgt_y_truth[(round(len(tgt_y_truth)*(1-test_size))):].numpy()
     tgt_y_hat_train, tgt_y_hat_test = tgt_y_hat[:-(round(len(tgt_y_truth)*test_size))].numpy(), tgt_y_hat[(round(len(tgt_y_truth)*(1-test_size))):].numpy()
+
+    # Save ground truth and predictions
     # np.save('tgt_y_truth.npy', tgt_y_truth, allow_pickle=False, fix_imports=False)
     # np.save('tgt_y_hat.npy', tgt_y_hat, allow_pickle=False, fix_imports=False)
     

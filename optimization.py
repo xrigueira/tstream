@@ -101,7 +101,7 @@ encoder_sequence_len = crushed_encoder_sequence_len
 
 # Make src mask for the decoder with size
 # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
-src_mask = utils.masker(dim1=output_sequence_length, dim2=encoder_sequence_len).to(device)
+src_mask = utils.unmasker(dim1=output_sequence_length, dim2=encoder_sequence_len).to(device)
 
 # Make tgt mask for decoder with size
 # [batch_size*n_heads, output_sequence_length, output_sequence_length]
@@ -191,10 +191,12 @@ def train_test_infer(parameterization):
     
     # Instantiate the transformer model and send it to device
     model = tst.TimeSeriesTransformer(input_size=len(src_variables), decoder_sequence_len=decoder_sequence_len, 
-            batch_first=batch_first, d_model=d_model, n_encoder_layers=n_encoder_layers, 
-            n_decoder_layers=n_decoder_layers, n_heads=n_heads, dropout_encoder=0.2, 
-            dropout_decoder=0.2, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
-            dim_feedforward_decoder=in_features_decoder_linear_layer, num_predicted_features=len(tgt_variables)).to(device)
+                                    batch_first=batch_first, d_model=d_model, n_encoder_layers=n_encoder_layers, 
+                                    n_decoder_layers=n_decoder_layers, n_heads=n_heads, dropout_encoder=0.2, 
+                                    dropout_decoder=0, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
+                                    dim_feedforward_decoder=in_features_decoder_linear_layer, num_predicted_features=len(tgt_variables)).to(device)
+    # Send model to device
+    model.to(device)
     
     # Define optimizer and loss function
     loss_function = nn.MSELoss()
