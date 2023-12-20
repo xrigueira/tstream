@@ -215,7 +215,7 @@ def train_test_infer(parameterization):
     # Get NSE metric on inference
     tgt_y_truth, tgt_y_truth_train, tgt_y_truth_test, tgt_y_hat, tgt_y_hat_train, tgt_y_hat_test = mn.inference(inference_data, model, src_mask, tgt_mask, device, test_size)
 
-    nse = mn.nash_sutcliffe_efficiency(tgt_y_truth_test, tgt_y_hat_test)
+    nse = utils.nash_sutcliffe_efficiency(tgt_y_truth_test, tgt_y_hat_test)
     
     return nse
 
