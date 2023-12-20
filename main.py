@@ -15,6 +15,7 @@ import transformer as tst
 
 # Define the training step
 def train(dataloader, model, src_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch):
+    
     size = len(dataloader.dataset)
     model.train()
     training_loss = [] # For plotting purposes
@@ -38,7 +39,7 @@ def train(dataloader, model, src_mask, tgt_mask, loss_function, optimizer, devic
         training_loss.append(loss.item())
         epoch_train_loss = np.mean(training_loss)
         df_training.loc[epoch] = [epoch, epoch_train_loss]
-        
+
         # if i % 20 == 0:
         #     print('Current batch', i)
         #     loss, current = loss.item(), (i + 1) * len(src)
@@ -46,6 +47,7 @@ def train(dataloader, model, src_mask, tgt_mask, loss_function, optimizer, devic
 
 # Define testing step
 def test(dataloader, model, src_mask, tgt_mask, loss_function, device, df_testing, epoch):
+    
     num_batches = len(dataloader)
     model.eval()
     testing_loss = [] # For plotting purposes
@@ -56,7 +58,6 @@ def test(dataloader, model, src_mask, tgt_mask, loss_function, device, df_testin
             
             pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
             pred = pred.to(device)
-            print(mha_weights)
             loss = loss_function(pred, tgt_y.unsqueeze(2))
             
             # Save results for plotting
@@ -69,6 +70,7 @@ def test(dataloader, model, src_mask, tgt_mask, loss_function, device, df_testin
 
 # Define inference step
 def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
+    
     # Get ground truth
     tgt_y_truth = torch.zeros(len(inference_data))
     for i, (src, tgt, tgt_y) in enumerate(inference_data):
@@ -92,12 +94,12 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
             all_sa_weights_inference.append(sa_weights)
             all_mha_weights_inference.append(mha_weights)
             pred = pred.to(device)
-            # print(pred, tgt_y)
+
             tgt_y_hat[i] = pred
 
     # Save inference attention for the last step
-    np.save('all_sa_weights.npy', all_sa_weights_inference, allow_pickle=False, fix_imports=False)
-    np.save('all_mha_weights.npy', all_mha_weights_inference, allow_pickle=False, fix_imports=False)
+    np.save('all_sa_weights.npy', [sa_weight.cpu() for sa_weight in all_sa_weights_inference], allow_pickle=False, fix_imports=False)
+    np.save('all_mha_weights.npy', [mha_weight.cpu() for mha_weight in all_mha_weights_inference], allow_pickle=False, fix_imports=False)
     
     # Pass target_y_hat to cpu for plotting purposes
     tgt_y_hat = tgt_y_hat.cpu()
@@ -188,7 +190,7 @@ if __name__ == '__main__':
     model = tst.TimeSeriesTransformer(input_size=len(src_variables), decoder_sequence_len=decoder_sequence_len, 
                                     batch_first=batch_first, d_model=d_model, n_encoder_layers=n_encoder_layers, 
                                     n_decoder_layers=n_decoder_layers, n_heads=n_heads, dropout_encoder=0.2, 
-                                    dropout_decoder=0.2, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
+                                    dropout_decoder=0, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
                                     dim_feedforward_decoder=in_features_decoder_linear_layer, num_predicted_features=len(tgt_variables)).to(device)
     # Send model to device
     model.to(device)
@@ -199,7 +201,7 @@ if __name__ == '__main__':
     
     # Make src mask for the decoder with size
     # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
-    src_mask = utils.masker(dim1=output_sequence_length, dim2=encoder_sequence_len).to(device)
+    src_mask = utils.unmasker(dim1=output_sequence_length, dim2=encoder_sequence_len).to(device)
     
     # Make tgt mask for decoder with size
     # [batch_size*n_heads, output_sequence_length, output_sequence_length]
@@ -210,7 +212,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     # Update model in the training process and test it
-    epochs = 10 # 250
+    epochs = 5 # 250
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))

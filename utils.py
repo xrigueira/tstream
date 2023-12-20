@@ -30,6 +30,23 @@ def masker(dim1: int, dim2: int) -> Tensor:
     
     return torch.triu(torch.ones(dim1, dim2) * float('-inf'), diagonal=1)
 
+def unmasker(dim1: int, dim2: int) -> Tensor:
+    """
+    Generates a matrix of zeros.
+    ----------
+    Arguments:
+    dim1: int, for both src and tgt masking, this must be
+        a sequence length
+    dim2: int, for src masking this must be encoder sequence
+        length (i.e. the length of the input sequence to the model),
+        and for tgt masking , this must be target sequence length
+    
+    Return:
+    A tensor of shape [dim1, dim2]
+    """
+    
+    return torch.zeros(dim1, dim2)
+
 def get_indices(data: pd.DataFrame, window_size: int, step_size: int) -> list:
     
     """

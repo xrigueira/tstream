@@ -126,12 +126,18 @@
 
                 x = tgt
                 if self.norm_first:
-                    x, self._sa_weights = x + self._sa_block(self.norm1(x), tgt_mask, tgt_key_padding_mask, tgt_is_causal)[0], self._sa_block(self.norm1(x), tgt_mask, tgt_key_padding_mask, tgt_is_causal)[1]
-                    x, self._mha_weights = x + self._mha_block(self.norm2(x), memory, memory_mask, memory_key_padding_mask, memory_is_causal)[0], self._sa_block(self.norm1(x), tgt_mask, tgt_key_padding_mask, tgt_is_causal)[1]
+                    x = self.norm1(x)
+                    tmp_x_sa, self._sa_weights = self._sa_block(x, tgt_mask, tgt_key_padding_mask, tgt_is_causal)
+                    x = x + tmp_x_sa
+                    x = self.norm2(x)
+                    temp_x_mha, self._mha_weights = self._mha_block(x, memory, memory_mask, memory_key_padding_mask, memory_is_causal)
+                    x = x + temp_x_mha
                     x = x + self._ff_block(self.norm3(x))
                 else:
-                    x, self._sa_weights = self.norm1(x + self._sa_block(x, tgt_mask, tgt_key_padding_mask, tgt_is_causal)[0]), self._sa_block(self.norm1(x), tgt_mask, tgt_key_padding_mask, tgt_is_causal)[1]
-                    x, self._mha_weights = self.norm2(x + self._mha_block(x, memory, memory_mask, memory_key_padding_mask, memory_is_causal)[0]), self._mha_block(self.norm2(x), memory, memory_mask, memory_key_padding_mask, memory_is_causal)[1]
+                    tmp_x_sa, self._sa_weights = self._sa_block(x, tgt_mask, tgt_key_padding_mask, tgt_is_causal)
+                    x = self.norm1(x + tmp_x_sa)
+                    temp_x_mha, self._mha_weights = self._mha_block(x, memory, memory_mask, memory_key_padding_mask, memory_is_causal)
+                    x = self.norm2(x + temp_x_mha)
                     x = self.norm3(x + self._ff_block(x))
 
                 return x, self._sa_weights, self._mha_weights
