@@ -35,4 +35,4 @@ y = np.insert(y, 0, None)
 df = pd.DataFrame({'time': dates, 'X': X.flatten(), 'y': y.flatten()})
 
 # Save the database
-df.to_csv('data/utah/data.csv', sep=',', encoding='utf-8')
+df.to_csv('data/utah/data.csv', sep=',', index=False, encoding='utf-8')

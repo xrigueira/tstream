@@ -1,7 +1,9 @@
 import os
 import numpy as np
 import pandas as pd
+from scipy.stats import pearsonr
 from prettytable import PrettyTable
+
 
 import torch
 import torch.nn as nn
@@ -84,7 +86,7 @@ def get_indices(data: pd.DataFrame, window_size: int, step_size: int) -> list:
         
     return indices
 
-def read_data(data_dir: Union[str, Path] = 'data/utah', timestamp_col_name: str='time') -> pd.DataFrame:
+def read_data(data_dir: Union[str, Path] = 'data', timestamp_col_name: str='time') -> pd.DataFrame:
     
     """Read data from csv file and return a pd.DataFrame object.
     ----------
@@ -186,3 +188,15 @@ def nash_sutcliffe_efficiency(observed, modeled):
     nse = 1 - (numerator / denominator)
     
     return nse
+
+# Define function to calculate the percent bias
+def pbias(observed, modeled):
+    return np.sum(observed - modeled) / np.sum(observed) * 100
+
+# Define function to calculate the Kling-Gupta efficiency
+def kge(observed, modeled):
+    r = pearsonr(observed, modeled)[0]
+    alpha = np.std(modeled) / np.std(observed)
+    beta = np.sum(modeled) / np.sum(observed)
+
+    return 1 - np.sqrt((r - 1)**2 + (alpha - 1)**2 + (beta - 1)**2)

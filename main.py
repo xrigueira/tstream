@@ -46,11 +46,11 @@ def train(dataloader, model, src_mask, tgt_mask, loss_function, optimizer, devic
         #     print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
 # Define testing step
-def test(dataloader, model, src_mask, tgt_mask, loss_function, device, df_testing, epoch):
+def val(dataloader, model, src_mask, tgt_mask, loss_function, device, df_validation, epoch):
     
     num_batches = len(dataloader)
     model.eval()
-    testing_loss = [] # For plotting purposes
+    validation_loss = [] # For plotting purposes
     with torch.no_grad():
         for batch in dataloader:
             src, tgt, tgt_y = batch
@@ -61,23 +61,23 @@ def test(dataloader, model, src_mask, tgt_mask, loss_function, device, df_testin
             loss = loss_function(pred, tgt_y.unsqueeze(2))
             
             # Save results for plotting
-            testing_loss.append(loss.item())
-            epoch_test_loss = np.mean(testing_loss)
-            df_testing.loc[epoch] = [epoch, epoch_test_loss]
+            validation_loss.append(loss.item())
+            epoch_val_loss = np.mean(validation_loss)
+            df_validation.loc[epoch] = [epoch, epoch_val_loss]
     
     loss /= num_batches
     # print(f"Avg test loss: {loss:>8f}")
 
 # Define inference step
-def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
+def test(dataloader, model, src_mask, tgt_mask, device):
     
     # Get ground truth
-    tgt_y_truth = torch.zeros(len(inference_data))
-    for i, (src, tgt, tgt_y) in enumerate(inference_data):
+    tgt_y_truth = torch.zeros(len(dataloader))
+    for i, (src, tgt, tgt_y) in enumerate(dataloader):
         tgt_y_truth[i] = tgt_y
 
     # Define tensor to store the predictions
-    tgt_y_hat = torch.zeros((len(inference_data)), device=device)
+    tgt_y_hat = torch.zeros((len(dataloader)), device=device)
 
     # Define list to store the multi-head self attention weights
     all_sa_weights_inference = []
@@ -86,7 +86,7 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
     # Perform inference
     model.eval()
     with torch.no_grad():
-        for i, sample in enumerate(inference_data):
+        for i, sample in enumerate(dataloader):
             src, tgt, tgt_y = sample
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
 
@@ -104,14 +104,13 @@ def inference(inference_data, model, src_mask, tgt_mask, device, test_size):
     # Pass target_y_hat to cpu for plotting purposes
     tgt_y_hat = tgt_y_hat.cpu()
 
-    tgt_y_truth_train, tgt_y_truth_test = tgt_y_truth[:-(round(len(tgt_y_truth)*test_size))].numpy(), tgt_y_truth[(round(len(tgt_y_truth)*(1-test_size))):].numpy()
-    tgt_y_hat_train, tgt_y_hat_test = tgt_y_hat[:-(round(len(tgt_y_truth)*test_size))].numpy(), tgt_y_hat[(round(len(tgt_y_truth)*(1-test_size))):].numpy()
+    tgt_y_truth, tgt_y_hat = tgt_y_truth.numpy(), tgt_y_hat.numpy()
 
     # Save ground truth and predictions
     # np.save('tgt_y_truth.npy', tgt_y_truth, allow_pickle=False, fix_imports=False)
     # np.save('tgt_y_hat.npy', tgt_y_hat, allow_pickle=False, fix_imports=False)
     
-    return tgt_y_truth, tgt_y_truth_train, tgt_y_truth_test, tgt_y_hat, tgt_y_hat_train, tgt_y_hat_test
+    return tgt_y_truth, tgt_y_hat
 
 if __name__ == '__main__':
     
@@ -119,8 +118,8 @@ if __name__ == '__main__':
     torch.manual_seed(0)
     
     # Hyperparams
-    test_size = 0.2
     batch_size = 128
+    validation_size = 0.125
     src_variables = ['X']
     tgt_variables = ['y']
     input_variables = src_variables + tgt_variables
@@ -152,9 +151,18 @@ if __name__ == '__main__':
     data = utils.read_data(timestamp_col_name=timestamp_col_name)
 
     # Extract train and test data
-    training_data = data[:-(round(len(data)*test_size))]
-    testing_data = data[(round(len(data)*(1-test_size))):]
+    training_val_lower_bound = datetime.datetime(1980, 10, 1)
+    training_val_upper_bound = datetime.datetime(2010, 9, 30)
 
+    # Extract train and test data
+    training_val_data = data[(training_val_lower_bound <= data.index) & (data.index <= training_val_upper_bound)]
+    testing_data = data[data.index > training_val_upper_bound]
+
+    # Divide train data into train and validation data with a 8:1 ratio
+    validation_size = 0.2
+    training_data = training_val_data[:-(round(len(training_val_data)*validation_size))]
+    validation_data = training_val_data[(round(len(training_val_data)*(1-validation_size))):]
+    
     # Normalize the data
     from sklearn.preprocessing import MinMaxScaler
     scaler = MinMaxScaler()
@@ -163,27 +171,32 @@ if __name__ == '__main__':
     scaler.fit(training_data.iloc[:, 1:])
 
     training_data.iloc[:, 1:] = scaler.transform(training_data.iloc[:, 1:])
+    validation_data.iloc[:, 1:] = scaler.transform(validation_data.iloc[:, 1:])
     testing_data.iloc[:, 1:] = scaler.transform(testing_data.iloc[:, 1:])
 
     # Make list of (start_idx, end_idx) pairs that are used to slice the time series sequence into chuncks
     training_indices = utils.get_indices(data=training_data, window_size=window_size, step_size=step_size)
+    validation_indices = utils.get_indices(data=validation_data, window_size=window_size, step_size=step_size)
     testing_indices = utils.get_indices(data=testing_data, window_size=window_size, step_size=step_size)
-
+    
     # Make instance of the custom dataset class
     training_data = ds.TransformerDataset(data=torch.tensor(training_data[input_variables].values).float(),
                                         indices=training_indices, encoder_sequence_len=encoder_sequence_len, 
+                                        decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
+    validation_data = ds.TransformerDataset(data=torch.tensor(validation_data[input_variables].values).float(),
+                                        indices=validation_indices, encoder_sequence_len=encoder_sequence_len, 
                                         decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
     testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variables].values).float(),
                                         indices=testing_indices, encoder_sequence_len=encoder_sequence_len, 
                                         decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
     
-    # Define data for inference
-    inference_data = training_data + testing_data
-    
+
     # Set up dataloaders
+    training_val_data = training_data + validation_data
     training_data = DataLoader(training_data, batch_size, shuffle=True)
-    testing_data = DataLoader(testing_data, batch_size, shuffle=True)
-    inference_data = DataLoader(inference_data, batch_size=1)
+    validation_data = DataLoader(validation_data, shuffle=True)
+    testing_data = DataLoader(testing_data, batch_size=1)
+    training_val_data = DataLoader(training_val_data, batch_size=1)
     
     # Update the encoder sequence length to its crushed version
     encoder_sequence_len = crushed_encoder_sequence_len
@@ -217,39 +230,49 @@ if __name__ == '__main__':
     epochs = 5 # 250
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
-    df_testing = pd.DataFrame(columns=('epoch', 'loss_test'))
+    df_validation = pd.DataFrame(columns=('epoch', 'loss_test'))
     for t in range(epochs):
         print(f"Epoch {t+1}\n-------------------------------")
         train(training_data, model, src_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch=t)
-        test(testing_data, model, src_mask, tgt_mask, loss_function, device, df_testing, epoch=t)
+        val(validation_data, model, src_mask, tgt_mask, loss_function, device, df_validation, epoch=t)
     print("Done! ---Execution time: %s seconds ---" % (time.time() - start_time))
 
-    # # Save the model
-    # torch.save(model, "models/model.pth")
-    # print("Saved PyTorch entire model to models/model.pth")
+    # # # Save the model
+    # # torch.save(model, "models/model.pth")
+    # # print("Saved PyTorch entire model to models/model.pth")
 
-    # # Load the model
-    # model = torch.load("models/model.pth").to(device)
-    # print('Loaded PyTorch model from models/model.pth')
+    # # # Load the model
+    # # model = torch.load("models/model.pth").to(device)
+    # # print('Loaded PyTorch model from models/model.pth')
 
     # Inference
-    tgt_y_truth, tgt_y_truth_train, tgt_y_truth_test, tgt_y_hat, tgt_y_hat_train, tgt_y_hat_test = inference(inference_data, model, src_mask, tgt_mask, device, test_size)
+    tgt_y_truth_train_val, tgt_y_hat_train_val = test(training_val_data, model, src_mask, tgt_mask, device)
+    tgt_y_truth_test, tgt_y_hat_test = test(testing_data, model, src_mask, tgt_mask, device)
     
     # Plot loss
     plt.figure(1);plt.clf()
     plt.plot(df_training['epoch'], df_training['loss_train'], '-o', label='loss train')
-    plt.plot(df_training['epoch'], df_testing['loss_test'], '-o', label='loss test')
+    plt.plot(df_training['epoch'], df_validation['loss_test'], '-o', label='loss test')
     plt.yscale('log')
     plt.xlabel(r'epoch')
     plt.ylabel(r'loss')
     plt.legend()
     plt.show()
 
-    # Plot inference
+    # Plot testing results
     plt.figure(2);plt.clf()
-    plt.plot(tgt_y_truth, label='observed')
-    plt.plot(range(len(tgt_y_hat_train)), tgt_y_hat_train, label='predicted train')
-    plt.plot(range(len(tgt_y_hat_train), len(tgt_y_hat)), tgt_y_hat_test, color='lightskyblue', label='predicted test')
+    plt.plot(tgt_y_truth_train_val, label='observed')
+    plt.plot(tgt_y_hat_train_val, label='predicted')
+    plt.title('Training and validation results')
+    plt.xlabel(r'time (days)')
+    plt.ylabel(r'y')
+    plt.legend()
+    plt.show()
+
+    plt.figure(2);plt.clf()
+    plt.plot(tgt_y_truth_test, label='observed')
+    plt.plot(tgt_y_hat_test, label='predicted')
+    plt.title('Testing results')
     plt.xlabel(r'time (days)')
     plt.ylabel(r'y')
     plt.legend()
@@ -258,14 +281,22 @@ if __name__ == '__main__':
     # Metrics
     from sklearn.metrics import mean_squared_error
 
-    nse_train = utils.nash_sutcliffe_efficiency(tgt_y_truth_train, tgt_y_hat_train)
-    mse_train = mean_squared_error(tgt_y_truth_train, tgt_y_hat_train)
-    print('-- training result ')
-    print('NSE = ', nse_train)
-    print('MSE = ', mse_train)
-
+    nse_train_val = utils.nash_sutcliffe_efficiency(tgt_y_truth_train_val, tgt_y_hat_train_val)
+    rmse_train_val = np.sqrt(mean_squared_error(tgt_y_truth_train_val, tgt_y_hat_train_val))
+    pbias_train_val = utils.pbias(tgt_y_truth_train_val, tgt_y_hat_train_val)
+    kge_train_val = utils.kge(tgt_y_truth_train_val, tgt_y_hat_train_val)
+    print('\n-- Train/val results')
+    print('NSE = ', nse_train_val)
+    print('RMSE = ', rmse_train_val)
+    print('PBIAS = ', pbias_train_val)
+    print('KGE = ', kge_train_val)
+    
     nse_test = utils.nash_sutcliffe_efficiency(tgt_y_truth_test, tgt_y_hat_test)
-    mse_test = mean_squared_error(tgt_y_truth_test, tgt_y_hat_test)
-    print('\n-- test result ')
+    rmse_test = np.sqrt(mean_squared_error(tgt_y_truth_test, tgt_y_hat_test))
+    pbias_test = utils.pbias(tgt_y_truth_test, tgt_y_hat_test)
+    kge_test = utils.kge(tgt_y_truth_test, tgt_y_hat_test)
+    print('\n-- Testing results')
     print('NSE = ', nse_test)
-    print('MSE = ', mse_test)
+    print('RMSE = ', rmse_test)
+    print('PBIAS = ', pbias_test)
+    print('KGE = ', kge_test)
