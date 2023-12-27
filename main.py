@@ -154,49 +154,53 @@ if __name__ == '__main__':
     training_val_lower_bound = datetime.datetime(1980, 10, 1)
     training_val_upper_bound = datetime.datetime(2010, 9, 30)
 
-    # Extract train and test data
+    # Extract train/validation and test data
     training_val_data = data[(training_val_lower_bound <= data.index) & (data.index <= training_val_upper_bound)]
     testing_data = data[data.index > training_val_upper_bound]
-
-    # Divide train data into train and validation data with a 8:1 ratio
-    validation_size = 0.2
-    training_data = training_val_data[:-(round(len(training_val_data)*validation_size))]
-    validation_data = training_val_data[(round(len(training_val_data)*(1-validation_size))):]
     
     # Normalize the data
     from sklearn.preprocessing import MinMaxScaler
     scaler = MinMaxScaler()
 
     # Fit scaler on the training set
-    scaler.fit(training_data.iloc[:, 1:])
+    scaler.fit(training_val_data.iloc[:, 1:])
 
-    training_data.iloc[:, 1:] = scaler.transform(training_data.iloc[:, 1:])
-    validation_data.iloc[:, 1:] = scaler.transform(validation_data.iloc[:, 1:])
+    # Transform the training and test sets
+    training_val_data.iloc[:, 1:] = scaler.transform(training_val_data.iloc[:, 1:])
     testing_data.iloc[:, 1:] = scaler.transform(testing_data.iloc[:, 1:])
 
     # Make list of (start_idx, end_idx) pairs that are used to slice the time series sequence into chuncks
-    training_indices = utils.get_indices(data=training_data, window_size=window_size, step_size=step_size)
-    validation_indices = utils.get_indices(data=validation_data, window_size=window_size, step_size=step_size)
+    training_val_indices = utils.get_indices(data=training_val_data, window_size=window_size, step_size=step_size)
+
+    # Divide train data into train and validation data with a 8:1 ratio using the indices.
+    # This is done this way because we need 4 years of data to create the summarized nonuniform timesteps,
+    # what limits the size of the validation set. However, with this implementation, we use data from the
+    # traning part to build the summarized nonuniform timesteps for the validation set. For example, if
+    # we use the current validation size, the set would have less than four years of data and would not
+    # be able to create the summarized nonuniform timesteps.
+    validation_size = 0.125
+    training_indices = training_val_indices[:-(round(len(training_val_indices)*validation_size))]
+    validation_indices = training_val_indices[(round(len(training_val_indices)*(1-validation_size))):]
+    
     testing_indices = utils.get_indices(data=testing_data, window_size=window_size, step_size=step_size)
     
     # Make instance of the custom dataset class
-    training_data = ds.TransformerDataset(data=torch.tensor(training_data[input_variables].values).float(),
+    training_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
                                         indices=training_indices, encoder_sequence_len=encoder_sequence_len, 
                                         decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
-    validation_data = ds.TransformerDataset(data=torch.tensor(validation_data[input_variables].values).float(),
+    validation_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
                                         indices=validation_indices, encoder_sequence_len=encoder_sequence_len, 
                                         decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
     testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variables].values).float(),
                                         indices=testing_indices, encoder_sequence_len=encoder_sequence_len, 
                                         decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
-    
 
     # Set up dataloaders
-    training_val_data = training_data + validation_data
+    training_val_data = training_data + validation_data # For testing puporses
     training_data = DataLoader(training_data, batch_size, shuffle=True)
     validation_data = DataLoader(validation_data, shuffle=True)
     testing_data = DataLoader(testing_data, batch_size=1)
-    training_val_data = DataLoader(training_val_data, batch_size=1)
+    training_val_data = DataLoader(training_val_data, batch_size=1) # For testing puporses
     
     # Update the encoder sequence length to its crushed version
     encoder_sequence_len = crushed_encoder_sequence_len
