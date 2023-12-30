@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
     # Read data
     data = utils.read_data(timestamp_col_name=timestamp_col_name)
-
+    
     # Extract train and test data
     training_val_lower_bound = datetime.datetime(1980, 10, 1)
     training_val_upper_bound = datetime.datetime(2010, 9, 30)
@@ -178,7 +178,6 @@ if __name__ == '__main__':
     # traning part to build the summarized nonuniform timesteps for the validation set. For example, if
     # we use the current validation size, the set would have less than four years of data and would not
     # be able to create the summarized nonuniform timesteps.
-    validation_size = 0.125
     training_indices = training_val_indices[:-(round(len(training_val_indices)*validation_size))]
     validation_indices = training_val_indices[(round(len(training_val_indices)*(1-validation_size))):]
     
@@ -194,11 +193,11 @@ if __name__ == '__main__':
     testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variables].values).float(),
                                         indices=testing_indices, encoder_sequence_len=encoder_sequence_len, 
                                         decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
-
+    
     # Set up dataloaders
     training_val_data = training_data + validation_data # For testing puporses
     training_data = DataLoader(training_data, batch_size, shuffle=True)
-    validation_data = DataLoader(validation_data, shuffle=True)
+    validation_data = DataLoader(validation_data, batch_size, shuffle=True)
     testing_data = DataLoader(testing_data, batch_size=1)
     training_val_data = DataLoader(training_val_data, batch_size=1) # For testing puporses
     
@@ -231,7 +230,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     # Update model in the training process and test it
-    epochs = 5 # 250
+    epochs = 400 # 250
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_validation = pd.DataFrame(columns=('epoch', 'loss_test'))
