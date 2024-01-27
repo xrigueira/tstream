@@ -130,8 +130,8 @@ if __name__ == '__main__':
 
     d_model = 32
     n_heads = 2
-    n_decoder_layers = 0 # Remember that with the current implementation it always has a decoder layer that returns the weights
     n_encoder_layers = 1
+    n_decoder_layers = 0 # Remember that with the current implementation it always has a decoder layer that returns the weights
     encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
     crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset 53
     decoder_sequence_len = 1 # length of input given to decoder
@@ -208,7 +208,7 @@ if __name__ == '__main__':
     model = tst.TimeSeriesTransformer(input_size=len(src_variables), decoder_sequence_len=decoder_sequence_len, 
                                     batch_first=batch_first, d_model=d_model, n_encoder_layers=n_encoder_layers, 
                                     n_decoder_layers=n_decoder_layers, n_heads=n_heads, dropout_encoder=0.2, 
-                                    dropout_decoder=0, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
+                                    dropout_decoder=0.2, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
                                     dim_feedforward_decoder=in_features_decoder_linear_layer, num_predicted_features=len(tgt_variables)).to(device)
     # Send model to device
     model.to(device)
@@ -219,18 +219,18 @@ if __name__ == '__main__':
     
     # Make src mask for the decoder with size
     # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
-    src_mask = utils.unmasker(dim1=output_sequence_length, dim2=encoder_sequence_len).to(device)
-    
+    src_mask = utils.masker(dim1=encoder_sequence_len, dim2=encoder_sequence_len).to(device)
+    print(src_mask)
     # Make tgt mask for decoder with size
     # [batch_size*n_heads, output_sequence_length, output_sequence_length]
     tgt_mask = utils.masker(dim1=output_sequence_length, dim2=output_sequence_length).to(device)
     
     # Define optimizer and loss function
     loss_function = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.00015)
 
     # Update model in the training process and test it
-    epochs = 400 # 250
+    epochs = 5 # 250
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_validation = pd.DataFrame(columns=('epoch', 'loss_test'))
@@ -248,58 +248,58 @@ if __name__ == '__main__':
     # # model = torch.load("models/model.pth").to(device)
     # # print('Loaded PyTorch model from models/model.pth')
 
-    # Inference
-    tgt_y_truth_train_val, tgt_y_hat_train_val = test(training_val_data, model, src_mask, tgt_mask, device)
-    tgt_y_truth_test, tgt_y_hat_test = test(testing_data, model, src_mask, tgt_mask, device)
+    # # Inference
+    # tgt_y_truth_train_val, tgt_y_hat_train_val = test(training_val_data, model, src_mask, tgt_mask, device)
+    # tgt_y_truth_test, tgt_y_hat_test = test(testing_data, model, src_mask, tgt_mask, device)
     
-    # Plot loss
-    plt.figure(1);plt.clf()
-    plt.plot(df_training['epoch'], df_training['loss_train'], '-o', label='loss train')
-    plt.plot(df_training['epoch'], df_validation['loss_test'], '-o', label='loss test')
-    plt.yscale('log')
-    plt.xlabel(r'epoch')
-    plt.ylabel(r'loss')
-    plt.legend()
-    plt.show()
+    # # Plot loss
+    # plt.figure(1);plt.clf()
+    # plt.plot(df_training['epoch'], df_training['loss_train'], '-o', label='loss train')
+    # plt.plot(df_training['epoch'], df_validation['loss_test'], '-o', label='loss test')
+    # plt.yscale('log')
+    # plt.xlabel(r'epoch')
+    # plt.ylabel(r'loss')
+    # plt.legend()
+    # plt.show()
 
-    # Plot testing results
-    plt.figure(2);plt.clf()
-    plt.plot(tgt_y_truth_train_val, label='observed')
-    plt.plot(tgt_y_hat_train_val, label='predicted')
-    plt.title('Training and validation results')
-    plt.xlabel(r'time (days)')
-    plt.ylabel(r'y')
-    plt.legend()
-    plt.show()
+    # # Plot testing results
+    # plt.figure(2);plt.clf()
+    # plt.plot(tgt_y_truth_train_val, label='observed')
+    # plt.plot(tgt_y_hat_train_val, label='predicted')
+    # plt.title('Training and validation results')
+    # plt.xlabel(r'time (days)')
+    # plt.ylabel(r'y')
+    # plt.legend()
+    # plt.show()
 
-    plt.figure(2);plt.clf()
-    plt.plot(tgt_y_truth_test, label='observed')
-    plt.plot(tgt_y_hat_test, label='predicted')
-    plt.title('Testing results')
-    plt.xlabel(r'time (days)')
-    plt.ylabel(r'y')
-    plt.legend()
-    plt.show()
+    # plt.figure(2);plt.clf()
+    # plt.plot(tgt_y_truth_test, label='observed')
+    # plt.plot(tgt_y_hat_test, label='predicted')
+    # plt.title('Testing results')
+    # plt.xlabel(r'time (days)')
+    # plt.ylabel(r'y')
+    # plt.legend()
+    # plt.show()
 
-    # Metrics
-    from sklearn.metrics import mean_squared_error
+    # # Metrics
+    # from sklearn.metrics import mean_squared_error
 
-    nse_train_val = utils.nash_sutcliffe_efficiency(tgt_y_truth_train_val, tgt_y_hat_train_val)
-    rmse_train_val = np.sqrt(mean_squared_error(tgt_y_truth_train_val, tgt_y_hat_train_val))
-    pbias_train_val = utils.pbias(tgt_y_truth_train_val, tgt_y_hat_train_val)
-    kge_train_val = utils.kge(tgt_y_truth_train_val, tgt_y_hat_train_val)
-    print('\n-- Train/val results')
-    print('NSE = ', nse_train_val)
-    print('RMSE = ', rmse_train_val)
-    print('PBIAS = ', pbias_train_val)
-    print('KGE = ', kge_train_val)
+    # nse_train_val = utils.nash_sutcliffe_efficiency(tgt_y_truth_train_val, tgt_y_hat_train_val)
+    # rmse_train_val = np.sqrt(mean_squared_error(tgt_y_truth_train_val, tgt_y_hat_train_val))
+    # pbias_train_val = utils.pbias(tgt_y_truth_train_val, tgt_y_hat_train_val)
+    # kge_train_val = utils.kge(tgt_y_truth_train_val, tgt_y_hat_train_val)
+    # print('\n-- Train/val results')
+    # print('NSE = ', nse_train_val)
+    # print('RMSE = ', rmse_train_val)
+    # print('PBIAS = ', pbias_train_val)
+    # print('KGE = ', kge_train_val)
     
-    nse_test = utils.nash_sutcliffe_efficiency(tgt_y_truth_test, tgt_y_hat_test)
-    rmse_test = np.sqrt(mean_squared_error(tgt_y_truth_test, tgt_y_hat_test))
-    pbias_test = utils.pbias(tgt_y_truth_test, tgt_y_hat_test)
-    kge_test = utils.kge(tgt_y_truth_test, tgt_y_hat_test)
-    print('\n-- Testing results')
-    print('NSE = ', nse_test)
-    print('RMSE = ', rmse_test)
-    print('PBIAS = ', pbias_test)
-    print('KGE = ', kge_test)
+    # nse_test = utils.nash_sutcliffe_efficiency(tgt_y_truth_test, tgt_y_hat_test)
+    # rmse_test = np.sqrt(mean_squared_error(tgt_y_truth_test, tgt_y_hat_test))
+    # pbias_test = utils.pbias(tgt_y_truth_test, tgt_y_hat_test)
+    # kge_test = utils.kge(tgt_y_truth_test, tgt_y_hat_test)
+    # print('\n-- Testing results')
+    # print('NSE = ', nse_test)
+    # print('RMSE = ', rmse_test)
+    # print('PBIAS = ', pbias_test)
+    # print('KGE = ', kge_test)
