@@ -219,8 +219,8 @@ if __name__ == '__main__':
     
     # Make src mask for the decoder with size
     # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
-    src_mask = utils.masker(dim1=encoder_sequence_len, dim2=encoder_sequence_len).to(device)
-    print(src_mask)
+    src_mask = utils.unmasker(dim1=encoder_sequence_len, dim2=encoder_sequence_len).to(device)
+    
     # Make tgt mask for decoder with size
     # [batch_size*n_heads, output_sequence_length, output_sequence_length]
     tgt_mask = utils.masker(dim1=output_sequence_length, dim2=output_sequence_length).to(device)

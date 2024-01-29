@@ -40,7 +40,6 @@ class TransformerDataset(Dataset):
 
         # print("From get_src_tgt: data size = {}".format(data.size()))
 
-
     def __len__(self):
         return len(self.indices)
 
@@ -141,5 +140,8 @@ class TransformerDataset(Dataset):
         
         # Concatenate the reduced data to create the final tensor
         src = torch.cat([years_data, months_data, weeks_data, last_month_data], dim=0)
+
+        # Reshape the crushed src to be [batch_size, 1, crushed_encoder_sequence_len]
+        # src = src.view(1, -1)
 
         return src
