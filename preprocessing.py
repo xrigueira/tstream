@@ -3,36 +3,58 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Load raw X data (snow melted + precipitation) - just element X1 of the loaded matlab object
-raw_data = scipy.io.loadmat('data/X_28x18.mat')['X1']
+variables = 'PET'
+variables = 'PETSWIT'
 
-# Load mask - element ismap of the loaded matlab object
-mask = scipy.io.loadmat('data/mask_28x18.mat')['ismap']
+if variables == 'PET':
 
-# Apply (dot_product) mask on the raw data to generate masked data (X)
-X = np.average(raw_data * mask, axis=(2, 3))
+    # Load raw X data (snow melted + precipitation) - just element X1 of the loaded matlab object
+    raw_data = scipy.io.loadmat('data/X_28x18.mat')['X1']
 
-# Save the masked data
-np.save('data/X_masked.npy', X, allow_pickle=False, fix_imports=False)
+    # Load mask - element ismap of the loaded matlab object
+    mask = scipy.io.loadmat('data/mask_28x18.mat')['ismap']
 
-# Load y data (stream flow) - element 'Q1' of the loaded matlab object
-y = scipy.io.loadmat('data/y.mat')['Q1']
+    # Apply (dot_product) mask on the raw data to generate masked data (X)
+    X = np.average(raw_data * mask, axis=(2, 3))
 
-# # Plot the data
-# plt.plot(X)
-# plt.plot(y)
-# plt.show()
+    # Save the masked data
+    np.save('data/X_masked.npy', X, allow_pickle=False, fix_imports=False)
 
-# Save the data to 
-# Generate dates starting from Jan 1st, 1980
-start_date = '1980-01-01'
-dates = pd.date_range(start=start_date, periods=len(X), freq='D')
+    # Load y data (stream flow) - element 'Q1' of the loaded matlab object
+    y = scipy.io.loadmat('data/y.mat')['Q1']
 
-# Add an empty element at the beginning of y
-y = np.insert(y, 0, None)
+    # # Plot the data
+    # plt.plot(X)
+    # plt.plot(y)
+    # plt.show()
 
-# Create a DataFrame
-df = pd.DataFrame({'time': dates, 'X': X.flatten(), 'y': y.flatten()})
+    # Save the data to 
+    # Generate dates starting from Jan 1st, 1980
+    start_date = '1980-01-01'
+    dates = pd.date_range(start=start_date, periods=len(X), freq='D')
 
-# Save the database
-df.to_csv('data/data.csv', sep=',', index=False, encoding='utf-8')
+    # Add an empty element at the beginning of y
+    y = np.insert(y, 0, None)
+
+    # Create a DataFrame
+    df = pd.DataFrame({'time': dates, 'X': X.flatten(), 'y': y.flatten()})
+
+    # Save the database
+    df.to_csv('data/data.csv', sep=',', index=False, encoding='utf-8')
+
+else:
+    # Load the data
+    raw_data = pd.read_csv('data/PET_SWIT.csv')
+
+    # Define the column names
+    raw_data.columns = ['x1', 'x2', 'y']
+
+    # Generate dates starting from Jan 2nd, 1980
+    start_date = '1980-01-02'
+    raw_data['time'] = pd.date_range(start=start_date, periods=len(raw_data), freq='D')
+
+    # Change column names
+    raw_data = raw_data[['time', 'x1', 'x2', 'y']]  # Reorder columns
+
+    # Save the data
+    raw_data.to_csv('data/data_2.csv', sep=',', index=False, encoding='utf-8')

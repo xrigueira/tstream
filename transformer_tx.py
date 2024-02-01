@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from typing import Optional, Any, Union, Callable, Tuple
 from torch import Tensor
 
 class PositionalEncoder(nn.Module):
@@ -62,161 +61,140 @@ class PositionalEncoder(nn.Module):
 
         return self.dropout(x)
     
-class customTransformerDecoderLayer(nn.Module):
-    
+class customTransformerEncoderLayer(nn.Module):
     """
-    This class implements a custom encoder layer made up of self-attn, multi-head-attn and feedforward network..
-
-    This custom decoder layer is based on the paper "Attention Is All You Need".
-    Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
-    Lukasz Kaiser, and Illia Polosukhin. 2017. Attention is all you need. In Advances in
-    Neural Information Processing Systems, pages 6000-6010. It has been modified to return
-    the attention weights.
-    ---------
-    Args:
-        d_model: the number of expected features in the input (required).
-        nhead: the number of heads in the multiheadattention models (required).
-        dim_feedforward: the dimension of the feedforward network model (default=2048).
-        dropout: the dropout value (default=0.1).
-        activation: the activation function of the intermediate layer, can be a string
-            ("relu" or "gelu") or a unary callable. Default: relu
-        layer_norm_eps: the eps value in layer normalization components (default=1e-5).
-        batch_first: If ``True``, then the input and output tensors are provided
-            as (batch, seq, feature). Default: ``False`` (seq, batch, feature).
-        norm_first: if ``True``, layer norm is done prior to self attention, multihead
-            attention and feedforward operations, respectively. Otherwise it's done after.
-            Default: ``False`` (after).
-        bias: If set to ``False``, ``Linear`` and ``LayerNorm`` layers will not learn an additive
-            bias. Default: ``True``.
-
-    Returns:
-        x: decoder output.
+    This class implements a custom encoder layer
     """
 
-    __constants__ = ['norm_first']
-
-    def __init__(self, d_model: int, n_heads: int, dim_feedforward: int = 2048, dropout: float = 0.1,
-                activation: Union[str, Callable[[Tensor], Tensor]] = F.relu,
-                layer_norm_eps: float = 1e-5, batch_first: bool = False, norm_first: bool = False,
-                bias: bool = True, device=None, dtype=None) -> None:
-        factory_kwargs = {'device': device, 'dtype': dtype}
+    def __init__(self, d_model: int, n_heads: int, dim_feedforward_encoder: int,
+                dropout_encoder: float, device, batch_first: bool = True, 
+                activation = F.relu, layer_norm_eps: float = 1e-5):
         super().__init__()
-        
-        # Define objects to store custom weights
-        self._sa_weights = None
-        self._mha_weights = None
 
-        self.self_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout, batch_first=batch_first,
-                                            bias=bias, **factory_kwargs)
-        self.multihead_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout, batch_first=batch_first,
-                                                 bias=bias, **factory_kwargs)
         # Implementation of Feedforward model
-        self.linear1 = nn.Linear(d_model, dim_feedforward, bias=bias, **factory_kwargs)
-        self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_feedforward, d_model, bias=bias, **factory_kwargs)
+        self.linear1 = nn.Linear(d_model, dim_feedforward_encoder, device=device)
+        self.dropout = nn.Dropout(dropout_encoder)
+        self.linear2 = nn.Linear(dim_feedforward_encoder, d_model, device=device)
+
+        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, device=device)
+        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, device=device)
+        self.dropout1 = nn.Dropout(dropout_encoder)
+        self.dropout2 = nn.Dropout(dropout_encoder)
+
+        # Multi-head attention
+        self.self_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout_encoder,
+                                                device=device, batch_first=batch_first)
+
+        # Define activation function options
+        if activation is F.relu or isinstance(activation, torch.nn.ReLU):
+            self.activation_relu_or_gelu = 1
+        elif activation is F.gelu or isinstance(activation, torch.nn.GELU):
+            self.activation_relu_or_gelu = 2
+        else:
+            self.activation_relu_or_gelu = 0
+        
+        self.activation = activation
+
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        if not hasattr(self, 'activation'):
+            self.activation = F.relu
+    
+    def forward(self, src: Tensor, src_mask: Tensor=None, src_key_padding_mask = None,
+                is_causal = False) -> Tensor:
+        
+        if self.training:
+            need_weights = False
+        else:
+            need_weights = True
+        
+        x = src
+        x = self.norm1(x + self._sa_block(x, src_mask, need_weights, is_causal=is_causal))
+        x = self.norm2(x + self._ff_block(x))
+
+        return x
+
+    # Self-attention block
+    def _sa_block(self, x, attn_mask, need_weights, is_causal = False):
+        x = self.self_attn(x, x, x,
+                            attn_mask=attn_mask,
+                            need_weights=need_weights, is_causal=is_causal)[0]
+        return self.dropout1(x)
+    
+    # Feed forward block
+    def _ff_block(self, x):
+        x = self.linear2(self.dropout(self.activation(self.linear1(x))))
+        return self.dropout2(x)
+    
+
+class customTransformerDecoderLayer(nn.Module):
+    """
+    This class implements a custom decoder layer
+    """
+
+    def __init__(self, d_model: int, n_heads: int, dim_feedforward_decoder: int,
+                dropout_decoder: float, device, batch_first: bool=True, 
+                activation = F.relu, layer_norm_eps: float = 1e-5, 
+                norm_first: bool=False):
+        super().__init__()
+
+        self.self_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout_decoder, batch_first=batch_first,
+                                            device=device)
+        self.multihead_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout_decoder, batch_first=batch_first,
+                                            device=device)
+
+        # Implementation of Feedforward model
+        self.linear1 = nn.Linear(d_model, dim_feedforward_decoder, device=device)
+        self.dropout = nn.Dropout(dropout_decoder)
+        self.linear2 = nn.Linear(dim_feedforward_decoder, d_model, device=device)
 
         self.norm_first = norm_first
-        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, bias=bias, **factory_kwargs)
-        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, bias=bias, **factory_kwargs)
-        self.norm3 = nn.LayerNorm(d_model, eps=layer_norm_eps, bias=bias, **factory_kwargs)
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
-        self.dropout3 = nn.Dropout(dropout)
+        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, device=device)
+        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, device=device)
+        self.norm3 = nn.LayerNorm(d_model, eps=layer_norm_eps, device=device)
+        self.dropout1 = nn.Dropout(dropout_decoder)
+        self.dropout2 = nn.Dropout(dropout_decoder)
+        self.dropout3 = nn.Dropout(dropout_decoder)
 
-        # Legacy string support for activation function.
-        if isinstance(activation, str):
-            self.activation = nn._get_activation_fn(activation)
-        else:
-            self.activation = activation
+        # Define activation function
+        self.activation = activation
 
     def __setstate__(self, state):
         if 'activation' not in state:
             state['activation'] = F.relu
         super().__setstate__(state)
-
-    def forward(
-        self,
-        tgt: Tensor,
-        memory: Tensor,
-        tgt_mask: Optional[Tensor] = None,
-        memory_mask: Optional[Tensor] = None,
-        tgt_key_padding_mask: Optional[Tensor] = None,
-        memory_key_padding_mask: Optional[Tensor] = None,
-        tgt_is_causal: bool = False,
-        memory_is_causal: bool = False,
-    ) -> Tuple[Tensor, Optional[Tensor], Optional[Tensor]]:
-        """Pass the inputs (and mask) through the decoder layer.
-
-        Args:
-            tgt: the sequence to the decoder layer (required).
-            memory: the sequence from the last layer of the encoder (required).
-            tgt_mask: the mask for the tgt sequence (optional).
-            memory_mask: the mask for the memory sequence (optional).
-            tgt_key_padding_mask: the mask for the tgt keys per batch (optional).
-            memory_key_padding_mask: the mask for the memory keys per batch (optional).
-            tgt_is_causal: If specified, applies a causal mask as ``tgt mask``.
-                Default: ``False``.
-                Warning:
-                ``tgt_is_causal`` provides a hint that ``tgt_mask`` is
-                the causal mask. Providing incorrect hints can result in
-                incorrect execution, including forward and backward
-                compatibility.
-            memory_is_causal: If specified, applies a causal mask as
-                ``memory mask``.
-                Default: ``False``.
-                Warning:
-                ``memory_is_causal`` provides a hint that
-                ``memory_mask`` is the causal mask. Providing incorrect
-                hints can result in incorrect execution, including
-                forward and backward compatibility.
-
-        Shape:
-            see the docs in Transformer class.
-        """
-        # see Fig. 1 of https://arxiv.org/pdf/2002.04745v1.pdf
-
+    
+    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, 
+                tgt_key_padding_mask=None, memory_key_padding_mask=None,
+                tgt_is_causal = False, memory_is_causal = True) -> Tensor:
+        
         x = tgt
-        if self.norm_first:
-            x = self.norm1(x)
-            tmp_x_sa, self._sa_weights = self._sa_block(x, tgt_mask, tgt_key_padding_mask, tgt_is_causal)
-            x = x + tmp_x_sa
-            x = self.norm2(x)
-            temp_x_mha, self._mha_weights = self._mha_block(x, memory, memory_mask, memory_key_padding_mask, memory_is_causal)
-            x = x + temp_x_mha
-            x = x + self._ff_block(self.norm3(x))
-        else:
-            tmp_x_sa, self._sa_weights = self._sa_block(x, tgt_mask, tgt_key_padding_mask, tgt_is_causal)
-            x = self.norm1(x + tmp_x_sa)
-            temp_x_mha, self._mha_weights = self._mha_block(x, memory, memory_mask, memory_key_padding_mask, memory_is_causal)
-            x = self.norm2(x + temp_x_mha)
-            x = self.norm3(x + self._ff_block(x))
+        x = self.norm1(x + self._sa_block(x, tgt_mask, tgt_is_causal))
+        tmp, att_weight = self._mha_block(x, memory, memory_mask, memory_is_causal)
+        x = self.norm2(x + tmp)
+        x = self.norm3(x + self._ff_block(x))
 
-        return x, self._sa_weights, self._mha_weights
+        return x, att_weight
 
     # self-attention block
-    def _sa_block(self, x: Tensor,
-                attn_mask: Optional[Tensor], key_padding_mask: Optional[Tensor], is_causal: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
-        x, self._sa_weights = self.self_attn(x, x, x,
-                        attn_mask=attn_mask,
-                        key_padding_mask=key_padding_mask,
-                        is_causal=is_causal,
-                        need_weights=True)
-        return self.dropout1(x), self._sa_weights
+    def _sa_block(self, x, attn_mask, key_padding_mask, is_causal = False):
+        x = self.self_attn(x, x, x,
+                           attn_mask=attn_mask,
+                           is_causal=is_causal)[0]
+        return self.dropout1(x)
 
     # multihead attention block
-    def _mha_block(self, x: Tensor, mem: Tensor,
-                attn_mask: Optional[Tensor], key_padding_mask: Optional[Tensor], is_causal: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
-        x, self._mha_weights = self.multihead_attn(x, mem, mem,
+    def _mha_block(self, x, mem, attn_mask, key_padding_mask, is_causal: bool = False):
+        x, att_weights = self.multihead_attn(x, mem, mem,
                                 attn_mask=attn_mask,
-                                key_padding_mask=key_padding_mask,
-                                is_causal=is_causal,
-                                need_weights=True)
-        return self.dropout2(x), self._mha_weights
+                                is_causal=is_causal)
+        return self.dropout2(x), att_weights
 
     # feed forward block
-    def _ff_block(self, x: Tensor) -> Tensor:
+    def _ff_block(self, x):
         x = self.linear2(self.dropout(self.activation(self.linear1(x))))
         return self.dropout3(x)
+
 
 class TimeSeriesTransformer(nn.Module):
     
@@ -224,12 +202,12 @@ class TimeSeriesTransformer(nn.Module):
     This class implements a transformer model that can be used for times series
     forecasting.
     """
-
     # d_embed from Tianfang transformer is d_model from my case
     def __init__(self, input_size: int, decoder_sequence_len: int, batch_first: bool,
                 d_model: int, n_encoder_layers: int, n_decoder_layers: int, n_heads: int,
                 dropout_encoder: float, dropout_decoder: float, dropout_pos_encoder: float,
-                dim_feedforward_encoder: int, dim_feedforward_decoder: int, num_predicted_features: int):
+                dim_feedforward_encoder: int, dim_feedforward_decoder: int, num_predicted_features: int,
+                device):
         super(TimeSeriesTransformer, self).__init__()
         
         """
@@ -251,6 +229,7 @@ class TimeSeriesTransformer(nn.Module):
         """
         
         self.model_tpye = 'Transformer'
+        self.device = device
 
         self.decoder_sequence_len = decoder_sequence_len
         
@@ -267,18 +246,20 @@ class TimeSeriesTransformer(nn.Module):
         # Create the positional encoder dropout, max_seq_len, d_model, batch_first
         self.positional_encoding_layer = PositionalEncoder(dropout=dropout_pos_encoder, max_seq_len=5000, d_model=d_model, batch_first=batch_first)
         
-        # The encoder layer used in the paper is identical to the one used by Vaswani et al (2017) 
-        # on which the PyTorch transformer model is based
-        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward_encoder,
-                                                dropout=dropout_encoder, batch_first=batch_first)
+        # Define the encoder layer
+        encoder_layer = customTransformerEncoderLayer(d_model=d_model, n_heads=n_heads, dim_feedforward_encoder=dim_feedforward_encoder,
+                                                        dropout_encoder=dropout_encoder, device=device, batch_first=batch_first)
 
         # Stack the encoder layers in nn.TransformerEncoder
         self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=n_encoder_layers, norm=None)
         
         # Define the decoder layer
-        decoder_layer = customTransformerDecoderLayer(d_model=d_model, n_heads=n_heads, dim_feedforward=dim_feedforward_decoder,
-                                                dropout=dropout_decoder,  batch_first=batch_first)
+        decoder_layer = customTransformerDecoderLayer(d_model=d_model, n_heads=n_heads, dim_feedforward_decoder=dim_feedforward_decoder,
+                                                        dropout_decoder=dropout_decoder, device=device, batch_first=batch_first)
         
+        # # Define the last decoder layer that returns the attention weights
+        # decoder_layer_attention_weights = nn.AttentionWeightsTransformerDecoderLayer(d_model=d_model, nhead=n_heads, dim_feedforward=dim_feedforward_decoder,
+        #                                         dropout=dropout_decoder, batch_first=batch_first)
         
         # Stack the decoder layers in nn.TransformerDecoder
         self.decoder = nn.TransformerDecoder(decoder_layer=decoder_layer, num_layers=n_decoder_layers, norm=None)
@@ -327,7 +308,7 @@ class TimeSeriesTransformer(nn.Module):
         # not in this time series use case, because all my  input sequences are naturally of 
         # the same length. 
         # src shape: [batch_size, encoder_sequence_len, d_model]
-        src = self.encoder(src=src, mask=src_mask)
+        src = self.encoder(src=src)
         # print("From model.forward(): Size of src after encoder: {}".format(src.size()))
 
         # Pass decoder input through decoder input layer
@@ -347,7 +328,7 @@ class TimeSeriesTransformer(nn.Module):
 
         # Pass through the decoder
         # Output shape: [batch_size, target seq len, d_model]
-        decoder_output, sa_weights, mha_weights = self.decoder(tgt=decoder_output, memory=src, tgt_mask=tgt_mask, memory_mask=memory_mask)
+        decoder_output, mha_weights = self.decoder(tgt=decoder_output, memory=src, tgt_mask=tgt_mask, memory_mask=memory_mask)
         # print("From model.forward(): decoder_output shape after decoder: {}".format(decoder_output.shape))
         
         # Pass through the linear mapping
@@ -355,4 +336,4 @@ class TimeSeriesTransformer(nn.Module):
         decoder_output = self.linear_mapping(decoder_output)
         # print("From model.forward(): decoder_output size after linear_mapping = {}".format(decoder_output.size()))
         
-        return decoder_output, sa_weights, mha_weights
+        return decoder_output, mha_weights

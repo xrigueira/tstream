@@ -14,7 +14,7 @@ import dataset as ds
 import transformer as tst
 
 # Define the training step
-def train(dataloader, model, src_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch):
+def train(dataloader, model, src_mask, memory_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch):
     
     size = len(dataloader.dataset)
     model.train()
@@ -27,10 +27,10 @@ def train(dataloader, model, src_mask, tgt_mask, loss_function, optimizer, devic
         optimizer.zero_grad()
         
         # Compute prediction error
-        pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+        pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, memory_mask=memory_mask, tgt_mask=tgt_mask)
         pred = pred.to(device)
         loss = loss_function(pred, tgt_y.unsqueeze(2))
-        
+        print(mha_weights.shape)
         # Backpropagation
         loss.backward()
         optimizer.step()
@@ -56,7 +56,7 @@ def val(dataloader, model, src_mask, tgt_mask, loss_function, device, df_validat
             src, tgt, tgt_y = batch
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
             
-            pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+            pred, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
             pred = pred.to(device)
             loss = loss_function(pred, tgt_y.unsqueeze(2))
             
@@ -80,7 +80,7 @@ def test(dataloader, model, src_mask, tgt_mask, device):
     tgt_y_hat = torch.zeros((len(dataloader)), device=device)
 
     # Define list to store the multi-head self attention weights
-    all_sa_weights_inference = []
+    # all_sa_weights_inference = []
     all_mha_weights_inference = []
     
     # Perform inference
@@ -90,8 +90,8 @@ def test(dataloader, model, src_mask, tgt_mask, device):
             src, tgt, tgt_y = sample
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
 
-            pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
-            all_sa_weights_inference.append(sa_weights)
+            pred, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+            # all_sa_weights_inference.append(sa_weights)
             all_mha_weights_inference.append(mha_weights)
             pred = pred.to(device)
 
@@ -131,12 +131,12 @@ if __name__ == '__main__':
     d_model = 32
     n_heads = 2
     n_encoder_layers = 1
-    n_decoder_layers = 0 # Remember that with the current implementation it always has a decoder layer that returns the weights
+    n_decoder_layers = 1 # Remember that with the current implementation it always has a decoder layer that returns the weights
     encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
     crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset 53
     decoder_sequence_len = 1 # length of input given to decoder
-    output_sequence_length = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
-    window_size = encoder_sequence_len + output_sequence_length # used to slice data into sub-sequences
+    output_sequence_len = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
+    window_size = encoder_sequence_len + output_sequence_len # used to slice data into sub-sequences
     step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
     in_features_encoder_linear_layer = 32
     in_features_decoder_linear_layer = 32
@@ -186,13 +186,13 @@ if __name__ == '__main__':
     # Make instance of the custom dataset class
     training_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
                                         indices=training_indices, encoder_sequence_len=encoder_sequence_len, 
-                                        decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
+                                        decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
     validation_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
                                         indices=validation_indices, encoder_sequence_len=encoder_sequence_len, 
-                                        decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
+                                        decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
     testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variables].values).float(),
                                         indices=testing_indices, encoder_sequence_len=encoder_sequence_len, 
-                                        decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_length)
+                                        decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
     
     # Set up dataloaders
     training_val_data = training_data + validation_data # For testing puporses
@@ -210,6 +210,7 @@ if __name__ == '__main__':
                                     n_decoder_layers=n_decoder_layers, n_heads=n_heads, dropout_encoder=0.2, 
                                     dropout_decoder=0.2, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
                                     dim_feedforward_decoder=in_features_decoder_linear_layer, num_predicted_features=len(tgt_variables)).to(device)
+
     # Send model to device
     model.to(device)
     
@@ -219,11 +220,16 @@ if __name__ == '__main__':
     
     # Make src mask for the decoder with size
     # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
-    src_mask = utils.unmasker(dim1=encoder_sequence_len, dim2=encoder_sequence_len).to(device)
+    src_mask = utils.masker(dim1=encoder_sequence_len, dim2=encoder_sequence_len).to(device)
+    # src_mask = utils.generate_square_subsequent_mask(size=encoder_sequence_len).to(device)
     
+    # Make the memory mask for the decoder
+    memory_mask = utils.masker(dim1=output_sequence_len, dim2=encoder_sequence_len).to(device)
+
     # Make tgt mask for decoder with size
     # [batch_size*n_heads, output_sequence_length, output_sequence_length]
-    tgt_mask = utils.masker(dim1=output_sequence_length, dim2=output_sequence_length).to(device)
+    tgt_mask = utils.masker(dim1=output_sequence_len, dim2=output_sequence_len).to(device)
+    # tgt_mask = utils.generate_square_subsequent_mask(size=decoder_sequence_len).to(device)
     
     # Define optimizer and loss function
     loss_function = nn.MSELoss()
@@ -236,8 +242,8 @@ if __name__ == '__main__':
     df_validation = pd.DataFrame(columns=('epoch', 'loss_test'))
     for t in range(epochs):
         print(f"Epoch {t+1}\n-------------------------------")
-        train(training_data, model, src_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch=t)
-        val(validation_data, model, src_mask, tgt_mask, loss_function, device, df_validation, epoch=t)
+        train(training_data, model, src_mask, memory_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch=t)
+        # val(validation_data, model, src_mask, memory_mask, tgt_mask, loss_function, device, df_validation, epoch=t)
     print("Done! ---Execution time: %s seconds ---" % (time.time() - start_time))
 
     # # # Save the model
