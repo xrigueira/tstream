@@ -27,10 +27,10 @@ def train(dataloader, model, src_mask, memory_mask, tgt_mask, loss_function, opt
         optimizer.zero_grad()
         
         # Compute prediction error
-        pred, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, memory_mask=memory_mask, tgt_mask=tgt_mask)
+        pred, sa_weights_encoder, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, memory_mask=memory_mask, tgt_mask=tgt_mask)
         pred = pred.to(device)
         loss = loss_function(pred, tgt_y.unsqueeze(2))
-        print(mha_weights.shape)
+        print(sa_weights_encoder[0])
         # Backpropagation
         loss.backward()
         optimizer.step()
@@ -230,7 +230,7 @@ if __name__ == '__main__':
     # [batch_size*n_heads, output_sequence_length, output_sequence_length]
     tgt_mask = utils.masker(dim1=output_sequence_len, dim2=output_sequence_len).to(device)
     # tgt_mask = utils.generate_square_subsequent_mask(size=decoder_sequence_len).to(device)
-    
+
     # Define optimizer and loss function
     loss_function = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.00015)
