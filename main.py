@@ -46,7 +46,7 @@ def train(dataloader, model, src_mask, memory_mask, tgt_mask, loss_function, opt
         #     print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
 # Define testing step
-def val(dataloader, model, src_mask, tgt_mask, loss_function, device, df_validation, epoch):
+def val(dataloader, model, src_mask, memory_mask, tgt_mask, loss_function, device, df_validation, epoch):
     
     num_batches = len(dataloader)
     model.eval()
@@ -56,7 +56,7 @@ def val(dataloader, model, src_mask, tgt_mask, loss_function, device, df_validat
             src, tgt, tgt_y = batch
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
             
-            pred, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+            pred, sa_weights_encoder, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, memory_mask=memory_mask, tgt_mask=tgt_mask)
             pred = pred.to(device)
             loss = loss_function(pred, tgt_y.unsqueeze(2))
             
@@ -69,7 +69,7 @@ def val(dataloader, model, src_mask, tgt_mask, loss_function, device, df_validat
     # print(f"Avg test loss: {loss:>8f}")
 
 # Define inference step
-def test(dataloader, model, src_mask, tgt_mask, device):
+def test(dataloader, model, src_mask, memory_mask, tgt_mask, device):
     
     # Get ground truth
     tgt_y_truth = torch.zeros(len(dataloader))
@@ -90,7 +90,7 @@ def test(dataloader, model, src_mask, tgt_mask, device):
             src, tgt, tgt_y = sample
             src, tgt, tgt_y = src.to(device), tgt.to(device), tgt_y.to(device)
 
-            pred, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+            pred, sa_weights_encoder, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, memory_mask=memory_mask, tgt_mask=tgt_mask)
             # all_sa_weights_inference.append(sa_weights)
             all_mha_weights_inference.append(mha_weights)
             pred = pred.to(device)
