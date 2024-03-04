@@ -107,7 +107,10 @@ class TransformerDataset(Dataset):
         
         assert len(tgt_y) == tgt_sequence_len, "Length of tgt_y does not match target sequence length"
 
-        return src, tgt, tgt_y.squeeze(-1) # change size from [batch_size, tgt_seq_len, num_features] to [batch_size, tgt_seq_len] 
+        # the target sequence corresponding to the encoder input (src) in the same range for plotting purposes
+        tgt_p = sequence[:encoder_sequence_len, -1:] # Select the target variable in the same range as the encoder input
+
+        return src, tgt, tgt_y.squeeze(-1), tgt_p # change size from [batch_size, tgt_seq_len, num_features] to [batch_size, tgt_seq_len] 
         # tgt_y.squeeze(-1) is reverted in the test function with tgt_y.squeeze(2). Left as it is for now.
     
     def _crush_src(self, src):
