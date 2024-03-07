@@ -178,79 +178,79 @@ class customTransformerEncoderLayer(nn.Module):
             check_other=False,
         )
 
-        # see Fig. 1 of https://arxiv.org/pdf/2002.04745v1.pdf
-        why_not_sparsity_fast_path = ''
-        if not src.dim() == 3:
-            why_not_sparsity_fast_path = f"input not batched; expected src.dim() of 3 but got {src.dim()}"
-        elif self.training:
-            why_not_sparsity_fast_path = "training is enabled"
-        elif not self.self_attn.batch_first :
-            why_not_sparsity_fast_path = "self_attn.batch_first was not True"
-        elif not self.self_attn._qkv_same_embed_dim :
-            why_not_sparsity_fast_path = "self_attn._qkv_same_embed_dim was not True"
-        elif not self.activation_relu_or_gelu:
-            why_not_sparsity_fast_path = "activation_relu_or_gelu was not True"
-        elif not (self.norm1.eps == self.norm2.eps):
-            why_not_sparsity_fast_path = "norm1.eps is not equal to norm2.eps"
-        elif src.is_nested and (src_key_padding_mask is not None or src_mask is not None):
-            why_not_sparsity_fast_path = "neither src_key_padding_mask nor src_mask are not supported with NestedTensor input"
-        elif self.self_attn.num_heads % 2 == 1:
-            why_not_sparsity_fast_path = "num_head is odd"
-        elif torch.is_autocast_enabled():
-            why_not_sparsity_fast_path = "autocast is enabled"
-        if not why_not_sparsity_fast_path:
-            tensor_args = (
-                src,
-                self.self_attn.in_proj_weight,
-                self.self_attn.in_proj_bias,
-                self.self_attn.out_proj.weight,
-                self.self_attn.out_proj.bias,
-                self.norm1.weight,
-                self.norm1.bias,
-                self.norm2.weight,
-                self.norm2.bias,
-                self.linear1.weight,
-                self.linear1.bias,
-                self.linear2.weight,
-                self.linear2.bias,
-            )
+        # # see Fig. 1 of https://arxiv.org/pdf/2002.04745v1.pdf
+        # why_not_sparsity_fast_path = ''
+        # if not src.dim() == 3:
+        #     why_not_sparsity_fast_path = f"input not batched; expected src.dim() of 3 but got {src.dim()}"
+        # elif self.training:
+        #     why_not_sparsity_fast_path = "training is enabled"
+        # elif not self.self_attn.batch_first :
+        #     why_not_sparsity_fast_path = "self_attn.batch_first was not True"
+        # elif not self.self_attn._qkv_same_embed_dim :
+        #     why_not_sparsity_fast_path = "self_attn._qkv_same_embed_dim was not True"
+        # elif not self.activation_relu_or_gelu:
+        #     why_not_sparsity_fast_path = "activation_relu_or_gelu was not True"
+        # elif not (self.norm1.eps == self.norm2.eps):
+        #     why_not_sparsity_fast_path = "norm1.eps is not equal to norm2.eps"
+        # elif src.is_nested and (src_key_padding_mask is not None or src_mask is not None):
+        #     why_not_sparsity_fast_path = "neither src_key_padding_mask nor src_mask are not supported with NestedTensor input"
+        # elif self.self_attn.num_heads % 2 == 1:
+        #     why_not_sparsity_fast_path = "num_head is odd"
+        # elif torch.is_autocast_enabled():
+        #     why_not_sparsity_fast_path = "autocast is enabled"
+        # if not why_not_sparsity_fast_path:
+        #     tensor_args = (
+        #         src,
+        #         self.self_attn.in_proj_weight,
+        #         self.self_attn.in_proj_bias,
+        #         self.self_attn.out_proj.weight,
+        #         self.self_attn.out_proj.bias,
+        #         self.norm1.weight,
+        #         self.norm1.bias,
+        #         self.norm2.weight,
+        #         self.norm2.bias,
+        #         self.linear1.weight,
+        #         self.linear1.bias,
+        #         self.linear2.weight,
+        #         self.linear2.bias,
+        #     )
 
-            # We have to use list comprehensions below because TorchScript does not support
-            # generator expressions.
-            _supported_device_type = ["cpu", "cuda", torch.utils.backend_registration._privateuse1_backend_name]
-            if torch.overrides.has_torch_function(tensor_args):
-                why_not_sparsity_fast_path = "some Tensor argument has_torch_function"
-            elif not all((x.device.type in _supported_device_type) for x in tensor_args):
-                why_not_sparsity_fast_path = ("some Tensor argument's device is neither one of "
-                                              f"{_supported_device_type}")
-            elif torch.is_grad_enabled() and any(x.requires_grad for x in tensor_args):
-                why_not_sparsity_fast_path = ("grad is enabled and at least one of query or the "
-                                              "input/output projection weights or biases requires_grad")
+        #     # We have to use list comprehensions below because TorchScript does not support
+        #     # generator expressions.
+        #     _supported_device_type = ["cpu", "cuda", torch.utils.backend_registration._privateuse1_backend_name]
+        #     if torch.overrides.has_torch_function(tensor_args):
+        #         why_not_sparsity_fast_path = "some Tensor argument has_torch_function"
+        #     elif not all((x.device.type in _supported_device_type) for x in tensor_args):
+        #         why_not_sparsity_fast_path = ("some Tensor argument's device is neither one of "
+        #                                     f"{_supported_device_type}")
+        #     elif torch.is_grad_enabled() and any(x.requires_grad for x in tensor_args):
+        #         why_not_sparsity_fast_path = ("grad is enabled and at least one of query or the "
+        #                                     "input/output projection weights or biases requires_grad")
 
-            if not why_not_sparsity_fast_path:
-                merged_mask, mask_type = self.self_attn.merge_masks(src_mask, src_key_padding_mask, src)
-                return torch._transformer_encoder_layer_fwd(
-                    src,
-                    self.self_attn.embed_dim,
-                    self.self_attn.num_heads,
-                    self.self_attn.in_proj_weight,
-                    self.self_attn.in_proj_bias,
-                    self.self_attn.out_proj.weight,
-                    self.self_attn.out_proj.bias,
-                    self.activation_relu_or_gelu == 2,
-                    self.norm_first,
-                    self.norm1.eps,
-                    self.norm1.weight,
-                    self.norm1.bias,
-                    self.norm2.weight,
-                    self.norm2.bias,
-                    self.linear1.weight,
-                    self.linear1.bias,
-                    self.linear2.weight,
-                    self.linear2.bias,
-                    merged_mask,
-                    mask_type,
-                )
+        #     if not why_not_sparsity_fast_path:
+        #         merged_mask, mask_type = self.self_attn.merge_masks(src_mask, src_key_padding_mask, src)
+        #         return torch._transformer_encoder_layer_fwd(
+        #             src,
+        #             self.self_attn.embed_dim,
+        #             self.self_attn.num_heads,
+        #             self.self_attn.in_proj_weight,
+        #             self.self_attn.in_proj_bias,
+        #             self.self_attn.out_proj.weight,
+        #             self.self_attn.out_proj.bias,
+        #             self.activation_relu_or_gelu == 2,
+        #             self.norm_first,
+        #             self.norm1.eps,
+        #             self.norm1.weight,
+        #             self.norm1.bias,
+        #             self.norm2.weight,
+        #             self.norm2.bias,
+        #             self.linear1.weight,
+        #             self.linear1.bias,
+        #             self.linear2.weight,
+        #             self.linear2.bias,
+        #             merged_mask,
+        #             mask_type,
+        #         )
 
 
         x = src
@@ -263,7 +263,7 @@ class customTransformerEncoderLayer(nn.Module):
             tmp_x_sa, self._sa_weights = self._sa_block(x, src_mask, src_key_padding_mask, is_causal=is_causal)
             x = self.norm1(x + tmp_x_sa)
             x = self.norm2(x + self._ff_block(x))
-
+        
         return x, self._sa_weights
 
     # self-attention block
@@ -445,7 +445,7 @@ class TimeSeriesTransformer(nn.Module):
     forecasting.
     """
 
-    # d_embed from Tianfang transformer is d_model from my case
+    # d_embed from Tianfang's transformer is d_model from my case
     def __init__(self, input_size: int, decoder_sequence_len: int, batch_first: bool,
                 d_model: int, n_encoder_layers: int, n_decoder_layers: int, n_heads: int,
                 dropout_encoder: float, dropout_decoder: float, dropout_pos_encoder: float,

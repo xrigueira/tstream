@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+plt.style.use('ggplot')
 
 # Sample data for bars
 data_bar = [5, 8, 2, 10]

@@ -62,12 +62,12 @@ class TransformerDataset(Dataset):
         
         # print("From __getitem__: sequence length = {}".format(len(sequence)))
 
-        src, tgt, tgt_y = self._get_src_tgt(sequence=sequence, encoder_sequence_len=self.encoder_sequence_len,
+        src, tgt, tgt_y, tgt_p = self._get_src_tgt(sequence=sequence, encoder_sequence_len=self.encoder_sequence_len,
             decoder_sequence_len=self.decoder_sequence_len, tgt_sequence_len=self.tgt_sequence_len)
         
         src = self._crush_src(src=src)
 
-        return src, tgt, tgt_y
+        return src, tgt, tgt_y, tgt_p
     
     def _get_src_tgt(self, sequence: torch.Tensor, encoder_sequence_len: int, decoder_sequence_len: int, 
                     tgt_sequence_len: int) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:

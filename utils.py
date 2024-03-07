@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr
-from prettytable import PrettyTable
+# from prettytable import PrettyTable
 
 
 import torch
@@ -172,22 +172,22 @@ def to_numeric_and_downcast_data(df: pd.DataFrame):
 
     return df
 
-# Define function to get and format the number of parameters
-def count_parameters(model):
-    table = PrettyTable(["Modules", "Parameters"])
-    total_params = 0
+# # Define function to get and format the number of parameters
+# def count_parameters(model):
+#     table = PrettyTable(["Modules", "Parameters"])
+#     total_params = 0
     
-    for name, parameter in model.named_parameters():
-        if not parameter.requires_grad:
-            continue
-        params = parameter.numel()
-        table.add_row([name, params])
-        total_params += params
+#     for name, parameter in model.named_parameters():
+#         if not parameter.requires_grad:
+#             continue
+#         params = parameter.numel()
+#         table.add_row([name, params])
+#         total_params += params
     
-    print(table)
-    print(f"Total trainable parameters: {total_params}")
+#     print(table)
+#     print(f"Total trainable parameters: {total_params}")
     
-    return total_params
+#     return total_params
 
 # Define Nash-Sutcliffe efficiency
 def nash_sutcliffe_efficiency(observed, modeled):

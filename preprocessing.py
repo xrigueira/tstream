@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# variables = 'masked_SWIT'
-variables = 'unmasked_SWIT_PET'
+variables = 'masked_SWIT'
+# variables = 'unmasked_SWIT_PET'
 
 if variables == 'masked_SWIT':
 

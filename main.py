@@ -30,7 +30,7 @@ def train(dataloader, model, src_mask, memory_mask, tgt_mask, loss_function, opt
         pred, sa_weights_encoder, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, memory_mask=memory_mask, tgt_mask=tgt_mask)
         pred = pred.to(device)
         loss = loss_function(pred, tgt_y.unsqueeze(2))
-        print(sa_weights_encoder[0])
+        # print(sa_weights_encoder[0])
         # Backpropagation
         loss.backward()
         optimizer.step()
@@ -98,16 +98,16 @@ def test(dataloader, model, src_mask, memory_mask, tgt_mask, device):
             pred = pred.to(device)
 
             # Save src, tgt and tgt_y, and pred for plotting purposes
-            np.save(f'src_{i}.npy', src, allow_pickle=False, fix_imports=False)
-            np.save(f'tgt_p_{i}.npy', tgt_p, allow_pickle=False, fix_imports=False)
-            np.save(f'tgt_y_hat_{i}.npy', pred, allow_pickle=False, fix_imports=False)
+            np.save(f'results/src_{i}.npy', src.cpu(), allow_pickle=False, fix_imports=False)
+            np.save(f'results/tgt_p_{i}.npy', tgt_p.cpu(), allow_pickle=False, fix_imports=False)
+            np.save(f'results/tgt_y_hat_{i}.npy', pred.cpu(), allow_pickle=False, fix_imports=False)
 
             tgt_y_hat[i] = pred
 
     # Save inference attention for the last step
-    np.save('all_sa_encoder_weights.npy', [sa_weight_encoder.cpu() for sa_weight_encoder in all_sa_weights_encoder_inference], allow_pickle=False, fix_imports=False)
-    np.save('all_sa_weights.npy', [sa_weight.cpu() for sa_weight in all_sa_weights_inference], allow_pickle=False, fix_imports=False)
-    np.save('all_mha_weights.npy', [mha_weight.cpu() for mha_weight in all_mha_weights_inference], allow_pickle=False, fix_imports=False)
+    np.save('results/all_sa_encoder_weights.npy', [sa_weight_encoder.cpu() for sa_weight_encoder in all_sa_weights_encoder_inference], allow_pickle=False, fix_imports=False)
+    np.save('results/all_sa_weights.npy', [sa_weight.cpu() for sa_weight in all_sa_weights_inference], allow_pickle=False, fix_imports=False)
+    np.save('results/all_mha_weights.npy', [mha_weight.cpu() for mha_weight in all_mha_weights_inference], allow_pickle=False, fix_imports=False)
     
     # Pass target_y_hat to cpu for plotting purposes
     tgt_y_hat = tgt_y_hat.cpu()
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     
     # Print model and number of parameters
     print('Defined model:\n', model)
-    utils.count_parameters(model)
+    # utils.count_parameters(model)
     
     # Make src mask for the decoder with size
     # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     epochs = 5 # 250
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
-    df_validation = pd.DataFrame(columns=('epoch', 'loss_test'))
+    df_validation = pd.DataFrame(columns=('epoch', 'loss_val'))
     for t in range(epochs):
         print(f"Epoch {t+1}\n-------------------------------")
         train(training_data, model, src_mask, memory_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch=t)
