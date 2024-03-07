@@ -1,9 +1,11 @@
 import os
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+plt.style.use('ggplot')
 from scipy.stats import pearsonr
 # from prettytable import PrettyTable
-
+from sklearn.metrics import mean_squared_error
 
 import torch
 import torch.nn as nn
@@ -190,7 +192,7 @@ def to_numeric_and_downcast_data(df: pd.DataFrame):
 #     return total_params
 
 # Define Nash-Sutcliffe efficiency
-def nash_sutcliffe_efficiency(observed, modeled):
+def get_nash_sutcliffe_efficiency(observed, modeled):
     mean_observed = np.mean(observed)
     numerator = np.sum((observed - modeled)**2)
     denominator = np.sum((observed - mean_observed)**2)
@@ -200,13 +202,65 @@ def nash_sutcliffe_efficiency(observed, modeled):
     return nse
 
 # Define function to calculate the percent bias
-def pbias(observed, modeled):
+def get_pbias(observed, modeled):
     return np.sum(observed - modeled) / np.sum(observed) * 100
 
 # Define function to calculate the Kling-Gupta efficiency
-def kge(observed, modeled):
+def get_kge(observed, modeled):
     r = pearsonr(observed, modeled)[0]
     alpha = np.std(modeled) / np.std(observed)
     beta = np.sum(modeled) / np.sum(observed)
 
     return 1 - np.sqrt((r - 1)**2 + (alpha - 1)**2 + (beta - 1)**2)
+
+def metrics(truth, hat, phase):
+    """
+    Calculate the Nash-Sutcliffe efficiency, root mean square error,
+    percent bias, and Kling-Gupta efficiency of the model's predictions.
+    ----------
+    Arguments:
+    truth (np.array): np.array, the observed values
+    hat (np.array): the model's predictions
+    phase (str): the phase of the data. Must be one of "train", "val", or "test"
+    
+    Returns:
+    nse (float): Nash-Sutcliffe efficiency
+    rmse (float): root mean square error
+    pbias (float): percent bias
+    kge (float): Kling-Gupta efficiency
+    """
+    
+    nse = get_nash_sutcliffe_efficiency(truth, hat)
+    rmse = np.sqrt(mean_squared_error(truth, hat))
+    pbias = get_pbias(truth, hat)
+    kge = get_kge(truth, hat)
+    
+    print(f'\n-- {phase}  results')
+    print(f'Nash-Sutcliffe efficiency: {nse}')
+    print(f'Root mean square error: {rmse}')
+    print(f'Percent bias: {pbias}')
+    print(f'Kling-Gupta efficiency: {kge}')
+
+    return nse, rmse, pbias, kge
+
+def plots(truth, hat, phase):
+    """
+    Plot the observed and predicted values
+    ----------
+    Arguments:
+    truth (np.array): np.array, the observed values
+    hat (np.array): the model's predictions
+    phase (str): the phase of the data. Must be one of "train", "val", or "test"
+
+    Returns:
+    None
+    """
+
+    plt.figure();plt.clf()
+    plt.plot(truth, label='observed')
+    plt.plot(hat, label='predicted')
+    plt.title(f'{phase} results')
+    plt.xlabel(r'time (days)')
+    plt.ylabel(r'y')
+    plt.legend()
+    plt.show()

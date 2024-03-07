@@ -50,6 +50,8 @@ class TransformerDataset(Dataset):
         1) src (the encoder input)
         2) tgt (the decoder input)
         3) tgt_y (the target)
+        4) src_p (the encoder input for plotting)
+        5) tgt_p (the target for plotting)
         """
         
         # Get the first element of the i'th tuple in the list self.indices
@@ -65,9 +67,11 @@ class TransformerDataset(Dataset):
         src, tgt, tgt_y, tgt_p = self._get_src_tgt(sequence=sequence, encoder_sequence_len=self.encoder_sequence_len,
             decoder_sequence_len=self.decoder_sequence_len, tgt_sequence_len=self.tgt_sequence_len)
         
+        src_p = src # Used for plotting
+
         src = self._crush_src(src=src)
 
-        return src, tgt, tgt_y, tgt_p
+        return src, tgt, tgt_y, src_p, tgt_p
     
     def _get_src_tgt(self, sequence: torch.Tensor, encoder_sequence_len: int, decoder_sequence_len: int, 
                     tgt_sequence_len: int) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:

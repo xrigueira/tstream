@@ -20,8 +20,8 @@ def train(dataloader, model, src_mask, memory_mask, tgt_mask, loss_function, opt
     model.train()
     training_loss = [] # For plotting purposes
     for i, batch in enumerate(dataloader):
-        src, tgt, tgt_y, tgt_p = batch
-        src, tgt, tgt_y, tgt_p = src.to(device), tgt.to(device), tgt_y.to(device), tgt_p.to(device)
+        src, tgt, tgt_y, src_p, tgt_p = batch
+        src, tgt, tgt_y, src_p, tgt_p = src.to(device), tgt.to(device), tgt_y.to(device), src_p.to(device), tgt_p.to(device)
 
         # Zero out gradients for every batch
         optimizer.zero_grad()
@@ -53,8 +53,8 @@ def val(dataloader, model, src_mask, memory_mask, tgt_mask, loss_function, devic
     validation_loss = [] # For plotting purposes
     with torch.no_grad():
         for batch in dataloader:
-            src, tgt, tgt_y, tgt_p = batch
-            src, tgt, tgt_y, tgt_p = src.to(device), tgt.to(device), tgt_y.to(device), tgt_p.to(device)
+            src, tgt, tgt_y, src_p, tgt_p = batch
+            src, tgt, tgt_y, src_p, tgt_p = src.to(device), tgt.to(device), tgt_y.to(device), src_p.to(device), tgt_p.to(device)
             
             pred, sa_weights_encoder, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, memory_mask=memory_mask, tgt_mask=tgt_mask)
             pred = pred.to(device)
@@ -73,7 +73,7 @@ def test(dataloader, model, src_mask, memory_mask, tgt_mask, device):
     
     # Get ground truth
     tgt_y_truth = torch.zeros(len(dataloader))
-    for i, (src, tgt, tgt_y, tgt_p) in enumerate(dataloader):
+    for i, (src, tgt, tgt_y, src_p, tgt_p) in enumerate(dataloader):
         tgt_y_truth[i] = tgt_y
 
     # Define tensor to store the predictions
@@ -88,26 +88,26 @@ def test(dataloader, model, src_mask, memory_mask, tgt_mask, device):
     model.eval()
     with torch.no_grad():
         for i, sample in enumerate(dataloader):
-            src, tgt, tgt_y, tgt_p = sample
-            src, tgt, tgt_y, tgt_p = src.to(device), tgt.to(device), tgt_y.to(device), tgt_p.to(device)
+            src, tgt, tgt_y, src_p, tgt_p = sample
+            src, tgt, tgt_y, src_p, tgt_p = src.to(device), tgt.to(device), tgt_y.to(device), src_p.to(device), tgt_p.to(device)
 
             pred, sa_weights_encoder, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, memory_mask=memory_mask, tgt_mask=tgt_mask)
-            all_sa_weights_encoder_inference.append(sa_weights)
+            all_sa_weights_encoder_inference.append(sa_weights_encoder)
             all_sa_weights_inference.append(sa_weights)
             all_mha_weights_inference.append(mha_weights)
             pred = pred.to(device)
 
             # Save src, tgt and tgt_y, and pred for plotting purposes
-            np.save(f'results/src_{i}.npy', src.cpu(), allow_pickle=False, fix_imports=False)
-            np.save(f'results/tgt_p_{i}.npy', tgt_p.cpu(), allow_pickle=False, fix_imports=False)
-            np.save(f'results/tgt_y_hat_{i}.npy', pred.cpu(), allow_pickle=False, fix_imports=False)
-
+            # np.save(f'results/src_p_{i}.npy', src_p.cpu(), allow_pickle=False, fix_imports=False)
+            # np.save(f'results/tgt_p_{i}.npy', tgt_p.cpu(), allow_pickle=False, fix_imports=False)
+            # np.save(f'results/tgt_y_hat_{i}.npy', pred.cpu(), allow_pickle=False, fix_imports=False)
+            
             tgt_y_hat[i] = pred
-
+    
     # Save inference attention for the last step
-    np.save('results/all_sa_encoder_weights.npy', [sa_weight_encoder.cpu() for sa_weight_encoder in all_sa_weights_encoder_inference], allow_pickle=False, fix_imports=False)
-    np.save('results/all_sa_weights.npy', [sa_weight.cpu() for sa_weight in all_sa_weights_inference], allow_pickle=False, fix_imports=False)
-    np.save('results/all_mha_weights.npy', [mha_weight.cpu() for mha_weight in all_mha_weights_inference], allow_pickle=False, fix_imports=False)
+    # np.save('results/all_sa_encoder_weights.npy', np.stack([sa_weight_encoder.cpu().numpy() for sa_weight_encoder in all_sa_weights_encoder_inference]), allow_pickle=False, fix_imports=False)
+    # np.save('results/all_sa_weights.npy', np.stack([sa_weight.cpu().numpy() for sa_weight in all_sa_weights_inference]), allow_pickle=False, fix_imports=False)
+    # np.save('results/all_mha_weights.npy', np.stack([mha_weight.cpu().numpy() for mha_weight in all_mha_weights_inference]), allow_pickle=False, fix_imports=False)
     
     # Pass target_y_hat to cpu for plotting purposes
     tgt_y_hat = tgt_y_hat.cpu()
@@ -269,7 +269,7 @@ if __name__ == '__main__':
     # Plot loss
     plt.figure(1);plt.clf()
     plt.plot(df_training['epoch'], df_training['loss_train'], '-o', label='loss train')
-    plt.plot(df_training['epoch'], df_validation['loss_test'], '-o', label='loss test')
+    plt.plot(df_training['epoch'], df_validation['loss_val'], '-o', label='loss test')
     plt.yscale('log')
     plt.xlabel(r'epoch')
     plt.ylabel(r'loss')
@@ -277,43 +277,9 @@ if __name__ == '__main__':
     plt.show()
 
     # Plot testing results
-    plt.figure(2);plt.clf()
-    plt.plot(tgt_y_truth_train_val, label='observed')
-    plt.plot(tgt_y_hat_train_val, label='predicted')
-    plt.title('Training and validation results')
-    plt.xlabel(r'time (days)')
-    plt.ylabel(r'y')
-    plt.legend()
-    plt.show()
-
-    plt.figure(2);plt.clf()
-    plt.plot(tgt_y_truth_test, label='observed')
-    plt.plot(tgt_y_hat_test, label='predicted')
-    plt.title('Testing results')
-    plt.xlabel(r'time (days)')
-    plt.ylabel(r'y')
-    plt.legend()
-    plt.show()
+    utils.plots(tgt_y_truth_train_val, tgt_y_hat_train_val, 'train_val')
+    utils.plots(tgt_y_truth_test, tgt_y_hat_test, 'test')
 
     # Metrics
-    from sklearn.metrics import mean_squared_error
-
-    nse_train_val = utils.nash_sutcliffe_efficiency(tgt_y_truth_train_val, tgt_y_hat_train_val)
-    rmse_train_val = np.sqrt(mean_squared_error(tgt_y_truth_train_val, tgt_y_hat_train_val))
-    pbias_train_val = utils.pbias(tgt_y_truth_train_val, tgt_y_hat_train_val)
-    kge_train_val = utils.kge(tgt_y_truth_train_val, tgt_y_hat_train_val)
-    print('\n-- Train/val results')
-    print('NSE = ', nse_train_val)
-    print('RMSE = ', rmse_train_val)
-    print('PBIAS = ', pbias_train_val)
-    print('KGE = ', kge_train_val)
-    
-    nse_test = utils.nash_sutcliffe_efficiency(tgt_y_truth_test, tgt_y_hat_test)
-    rmse_test = np.sqrt(mean_squared_error(tgt_y_truth_test, tgt_y_hat_test))
-    pbias_test = utils.pbias(tgt_y_truth_test, tgt_y_hat_test)
-    kge_test = utils.kge(tgt_y_truth_test, tgt_y_hat_test)
-    print('\n-- Testing results')
-    print('NSE = ', nse_test)
-    print('RMSE = ', rmse_test)
-    print('PBIAS = ', pbias_test)
-    print('KGE = ', kge_test)
+    utils.metrics(tgt_y_truth_train_val, tgt_y_hat_train_val, 'train_val')
+    utils.metrics(tgt_y_truth_test, tgt_y_hat_test, 'test')
