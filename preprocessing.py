@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from sklearn.preprocessing import MinMaxScaler
+
 variables = 'masked_SWIT'
 # variables = 'unmasked_SWIT_PET'
 
@@ -37,10 +39,14 @@ if variables == 'masked_SWIT':
     y = np.insert(y, 0, None)
 
     # Create a DataFrame
-    df = pd.DataFrame({'time': dates, 'X': X.flatten(), 'y': y.flatten()})
+    data = pd.DataFrame({'time': dates, 'X': X.flatten(), 'y': y.flatten()})
+
+    # Normalize the data
+    scaler = MinMaxScaler()
+    data.iloc[:, 1:] = scaler.fit_transform(data.iloc[:, 1:])
 
     # Save the database
-    df.to_csv('data/data.csv', sep=',', index=False, encoding='utf-8')
+    data.to_csv('data/data.csv', sep=',', index=False, encoding='utf-8')
 
 else:
 
@@ -63,6 +69,10 @@ else:
 
     # Change column names
     data = data[['time', 'x1', 'x2', 'y']]  # Reorder columns
+
+    # Normalize the data
+    scaler = MinMaxScaler()
+    data.iloc[:, 1:] = scaler.fit_transform(data.iloc[:, 1:])
 
     # Save the data
     data.to_csv('data/data.csv', sep=',', index=False, encoding='utf-8')
