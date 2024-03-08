@@ -97,14 +97,14 @@ def test(dataloader, model, src_mask, memory_mask, tgt_mask, device):
             all_mha_weights_inference.append(mha_weights)
             pred = pred.to(device)
 
-            # Save src, tgt and tgt_y, and pred for plotting purposes
+            # # Save src, tgt and tgt_y, and pred for plotting purposes
             # np.save(f'results/src_p_{i}.npy', src_p.cpu(), allow_pickle=False, fix_imports=False)
             # np.save(f'results/tgt_p_{i}.npy', tgt_p.cpu(), allow_pickle=False, fix_imports=False)
             # np.save(f'results/tgt_y_hat_{i}.npy', pred.cpu(), allow_pickle=False, fix_imports=False)
             
             tgt_y_hat[i] = pred
     
-    # Save inference attention for the last step
+    # # Save inference attention for the last step
     # np.save('results/all_sa_encoder_weights.npy', np.stack([sa_weight_encoder.cpu().numpy() for sa_weight_encoder in all_sa_weights_encoder_inference]), allow_pickle=False, fix_imports=False)
     # np.save('results/all_sa_weights.npy', np.stack([sa_weight.cpu().numpy() for sa_weight in all_sa_weights_inference]), allow_pickle=False, fix_imports=False)
     # np.save('results/all_mha_weights.npy', np.stack([mha_weight.cpu().numpy() for mha_weight in all_mha_weights_inference]), allow_pickle=False, fix_imports=False)
