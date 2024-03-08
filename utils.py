@@ -264,3 +264,80 @@ def plots(truth, hat, phase):
     plt.ylabel(r'y')
     plt.legend()
     plt.show()
+
+def weights_plot(iteration: int):
+
+    # Read weights data
+    weights = np.load('results/all_sa_encoder_weights.npy', allow_pickle=True, fix_imports=True)
+
+    # Subset the last row of the weights
+    weights = weights[iteration][0][-1]
+
+    # Split the data
+    days, weeks, months, years = weights[-30:], weights[-42:-30], weights[-50:-42], weights[-53:-50]
+
+    # Repeat the elements
+    weeks_repeated, months_repeated, years_repeated = np.repeat(weeks, 8), np.repeat(months, 30), np.repeat(years, 365)
+
+    # Concatenate all the arrays
+    weights = np.concatenate((years_repeated, months_repeated, weeks_repeated, days))
+
+    # Load the src
+    src = np.load(f'results/src_p_{iteration}.npy', allow_pickle=True, fix_imports=True)[0]
+
+    # Load the tgt_p
+    tgt_p = np.load(f'results/tgt_p_{iteration}.npy', allow_pickle=True, fix_imports=True)[0]
+
+    # Load the tgt_y_hat
+    tgt_y_hat = np.load(f'results/tgt_y_hat_{iteration}.npy', allow_pickle=True, fix_imports=True)[0]
+
+    # Add the predict data (tgt_y_hat) to the tgt_p and update the length of the weights and src
+    weights = np.append(weights, np.empty(1))
+    src = np.append(src, np.empty(1))
+    tgt_p = np.append(tgt_p, tgt_y_hat)
+
+    # Create the plot
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    ax2 = ax1.twinx()
+
+    # Plot bars on primary axes
+    x_data = range(-1461, 1)
+    bars = ax1.bar(x_data, weights, color='darkseagreen', width=0.7, label='Weights')
+
+    # Invert the y-axis for bars
+    ax1.invert_yaxis() 
+
+    # Plot lines on secondary axes
+    ax2.plot(x_data, src, color='dimgray', linewidth=1, label='SWIT')  # Add label for clarity
+    ax2.plot(x_data, src, color='salmon', linewidth=1, label='PET')  # Adjust marker and label
+    ax2.plot(x_data, tgt_p, color='cornflowerblue',linewidth=1, label='Q')  # Adjust marker and label
+
+    # Set labels and title
+    ax1.set_xlabel('Days before')
+    ax1.set_ylabel('Weights', color='dimgray')
+    ax2.set_ylabel('SWIT and PET values', color='dimgray')
+    plt.title(f'Q at iteration {iteration}')
+
+    # Additional customization
+    # ax1.tick_params('y', colors='darkseagreen')  # Set color for right y-axis ticks
+    # ax2.tick_params('y', colors='black')  # Set color for left y-axis ticks
+    # Get bars and labels for legend
+    bars, labels0 = ax1.get_legend_handles_labels()  # Get bars and labels for legend
+    lines1, labels1 = ax2.get_legend_handles_labels()  # Get lines and labels for legend
+
+    # Concatenate the bars and lines, and their respective labels
+    handles = bars + lines1
+    labels = labels0 + labels1
+
+    # Add legend to primary axes
+    ax1.legend(handles, labels, loc='upper left')  # Add legend to primary axes
+
+    # Show the plot
+    plt.tight_layout()
+    # plt.show()
+
+    # Save the plot
+    fig.savefig(f'plots/weights_plot_{iteration}.png')
+
+    # Close the plot
+    plt.close(fig)
