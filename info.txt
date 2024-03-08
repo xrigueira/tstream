@@ -31,7 +31,7 @@ Then multistep resolution: Use averages per month when we train on data far from
 to daily when we are getting closer to that point.
 
 Resources:
-One of the first codes which I though it was interesting: https://github.com/nok-halfspace/Transformer-Time-Series-Forecasting
+One of the first model I though it was interesting: https://github.com/nok-halfspace/Transformer-Time-Series-Forecasting
 
 Paper in which a trasformer was used for time series prediction https://arxiv.org/abs/2001.08317
 Adapted code from that paper https://github.com/KasperGroesLudvigsen/influenza_transformer/tree/main

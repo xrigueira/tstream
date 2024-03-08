@@ -40,7 +40,6 @@ class TransformerDataset(Dataset):
 
         # print("From get_src_tgt: data size = {}".format(data.size()))
 
-
     def __len__(self):
         return len(self.indices)
 
@@ -51,6 +50,8 @@ class TransformerDataset(Dataset):
         1) src (the encoder input)
         2) tgt (the decoder input)
         3) tgt_y (the target)
+        4) src_p (the encoder input for plotting)
+        5) tgt_p (the target for plotting)
         """
         
         # Get the first element of the i'th tuple in the list self.indices
@@ -63,12 +64,14 @@ class TransformerDataset(Dataset):
         
         # print("From __getitem__: sequence length = {}".format(len(sequence)))
 
-        src, tgt, tgt_y = self._get_src_tgt(sequence=sequence, encoder_sequence_len=self.encoder_sequence_len,
+        src, tgt, tgt_y, tgt_p = self._get_src_tgt(sequence=sequence, encoder_sequence_len=self.encoder_sequence_len,
             decoder_sequence_len=self.decoder_sequence_len, tgt_sequence_len=self.tgt_sequence_len)
         
+        src_p = src # Used for plotting
+
         src = self._crush_src(src=src)
 
-        return src, tgt, tgt_y
+        return src, tgt, tgt_y, src_p, tgt_p
     
     def _get_src_tgt(self, sequence: torch.Tensor, encoder_sequence_len: int, decoder_sequence_len: int, 
                     tgt_sequence_len: int) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
@@ -108,7 +111,10 @@ class TransformerDataset(Dataset):
         
         assert len(tgt_y) == tgt_sequence_len, "Length of tgt_y does not match target sequence length"
 
-        return src, tgt, tgt_y.squeeze(-1) # change size from [batch_size, tgt_seq_len, num_features] to [batch_size, tgt_seq_len] 
+        # the target sequence corresponding to the encoder input (src) in the same range for plotting purposes
+        tgt_p = sequence[:encoder_sequence_len, -1:] # Select the target variable in the same range as the encoder input
+
+        return src, tgt, tgt_y.squeeze(-1), tgt_p # change size from [batch_size, tgt_seq_len, num_features] to [batch_size, tgt_seq_len] 
         # tgt_y.squeeze(-1) is reverted in the test function with tgt_y.squeeze(2). Left as it is for now.
     
     def _crush_src(self, src):

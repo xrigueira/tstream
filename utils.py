@@ -1,9 +1,11 @@
 import os
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+plt.style.use('ggplot')
 from scipy.stats import pearsonr
 from prettytable import PrettyTable
-
+from sklearn.metrics import mean_squared_error
 
 import torch
 import torch.nn as nn
@@ -48,6 +50,16 @@ def unmasker(dim1: int, dim2: int) -> Tensor:
     """
     
     return torch.zeros(dim1, dim2)
+
+def generate_square_subsequent_mask(size):
+        
+        """Generates a square mask for the sequence of a given size. 
+        The masked positions are filled with float('-inf')."""
+        
+        mask = (torch.triu(torch.ones(size, size)) == 1).transpose(0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        
+        return mask
 
 def get_indices(data: pd.DataFrame, window_size: int, step_size: int) -> list:
     
@@ -180,7 +192,7 @@ def count_parameters(model):
     return total_params
 
 # Define Nash-Sutcliffe efficiency
-def nash_sutcliffe_efficiency(observed, modeled):
+def get_nash_sutcliffe_efficiency(observed, modeled):
     mean_observed = np.mean(observed)
     numerator = np.sum((observed - modeled)**2)
     denominator = np.sum((observed - mean_observed)**2)
@@ -190,13 +202,142 @@ def nash_sutcliffe_efficiency(observed, modeled):
     return nse
 
 # Define function to calculate the percent bias
-def pbias(observed, modeled):
+def get_pbias(observed, modeled):
     return np.sum(observed - modeled) / np.sum(observed) * 100
 
 # Define function to calculate the Kling-Gupta efficiency
-def kge(observed, modeled):
+def get_kge(observed, modeled):
     r = pearsonr(observed, modeled)[0]
     alpha = np.std(modeled) / np.std(observed)
     beta = np.sum(modeled) / np.sum(observed)
 
     return 1 - np.sqrt((r - 1)**2 + (alpha - 1)**2 + (beta - 1)**2)
+
+def metrics(truth, hat, phase):
+    """
+    Calculate the Nash-Sutcliffe efficiency, root mean square error,
+    percent bias, and Kling-Gupta efficiency of the model's predictions.
+    ----------
+    Arguments:
+    truth (np.array): np.array, the observed values
+    hat (np.array): the model's predictions
+    phase (str): the phase of the data. Must be one of "train", "val", or "test"
+    
+    Returns:
+    nse (float): Nash-Sutcliffe efficiency
+    rmse (float): root mean square error
+    pbias (float): percent bias
+    kge (float): Kling-Gupta efficiency
+    """
+    
+    nse = get_nash_sutcliffe_efficiency(truth, hat)
+    rmse = np.sqrt(mean_squared_error(truth, hat))
+    pbias = get_pbias(truth, hat)
+    kge = get_kge(truth, hat)
+    
+    print(f'\n-- {phase}  results')
+    print(f'Nash-Sutcliffe efficiency: {nse}')
+    print(f'Root mean square error: {rmse}')
+    print(f'Percent bias: {pbias}')
+    print(f'Kling-Gupta efficiency: {kge}')
+
+    return nse, rmse, pbias, kge
+
+def plots(truth, hat, phase):
+    """
+    Plot the observed and predicted values
+    ----------
+    Arguments:
+    truth (np.array): np.array, the observed values
+    hat (np.array): the model's predictions
+    phase (str): the phase of the data. Must be one of "train", "val", or "test"
+
+    Returns:
+    None
+    """
+
+    plt.figure();plt.clf()
+    plt.plot(truth, label='observed')
+    plt.plot(hat, label='predicted')
+    plt.title(f'{phase} results')
+    plt.xlabel(r'time (days)')
+    plt.ylabel(r'y')
+    plt.legend()
+    plt.show()
+
+def weights_plot(iteration: int):
+
+    # Read weights data
+    weights = np.load('results/all_sa_encoder_weights.npy', allow_pickle=True, fix_imports=True)
+
+    # Subset the last row of the weights
+    weights = weights[iteration][0][-1]
+
+    # Split the data
+    days, weeks, months, years = weights[-30:], weights[-42:-30], weights[-50:-42], weights[-53:-50]
+
+    # Repeat the elements
+    weeks_repeated, months_repeated, years_repeated = np.repeat(weeks, 8), np.repeat(months, 30), np.repeat(years, 365)
+
+    # Concatenate all the arrays
+    weights = np.concatenate((years_repeated, months_repeated, weeks_repeated, days))
+
+    # Load the src
+    src = np.load(f'results/src_p_{iteration}.npy', allow_pickle=True, fix_imports=True)[0]
+
+    # Load the tgt_p
+    tgt_p = np.load(f'results/tgt_p_{iteration}.npy', allow_pickle=True, fix_imports=True)[0]
+
+    # Load the tgt_y_hat
+    tgt_y_hat = np.load(f'results/tgt_y_hat_{iteration}.npy', allow_pickle=True, fix_imports=True)[0]
+
+    # Add the predict data (tgt_y_hat) to the tgt_p and update the length of the weights and src
+    weights = np.append(weights, np.empty(1))
+    src = np.append(src, np.empty(1))
+    tgt_p = np.append(tgt_p, tgt_y_hat)
+
+    # Create the plot
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    ax2 = ax1.twinx()
+
+    # Plot bars on primary axes
+    x_data = range(-1461, 1)
+    bars = ax1.bar(x_data, weights, color='darkseagreen', width=0.7, label='Weights')
+
+    # Invert the y-axis for bars
+    ax1.invert_yaxis() 
+
+    # Plot lines on secondary axes
+    ax2.plot(x_data, src, color='dimgray', linewidth=1, label='SWIT')  # Add label for clarity
+    ax2.plot(x_data, src, color='salmon', linewidth=1, label='PET')  # Adjust marker and label
+    ax2.plot(x_data, tgt_p, color='cornflowerblue',linewidth=1, label='Q')  # Adjust marker and label
+
+    # Set labels and title
+    ax1.set_xlabel('Days before')
+    ax1.set_ylabel('Weights', color='dimgray')
+    ax2.set_ylabel('SWIT and PET values', color='dimgray')
+    plt.title(f'Q at iteration {iteration}')
+
+    # Additional customization
+    # ax1.tick_params('y', colors='darkseagreen')  # Set color for right y-axis ticks
+    # ax2.tick_params('y', colors='black')  # Set color for left y-axis ticks
+    # Get bars and labels for legend
+    bars, labels0 = ax1.get_legend_handles_labels()  # Get bars and labels for legend
+    lines1, labels1 = ax2.get_legend_handles_labels()  # Get lines and labels for legend
+
+    # Concatenate the bars and lines, and their respective labels
+    handles = bars + lines1
+    labels = labels0 + labels1
+
+    # Add legend to primary axes
+    ax1.legend(handles, labels, loc='upper left')  # Add legend to primary axes
+
+    # Show the plot
+    plt.tight_layout()
+    # plt.show()
+
+    # Save the plot
+    fig.savefig(f'plots/weights_plot_{iteration}.png')
+
+    # Close the plot
+    plt.close(fig)
