@@ -224,7 +224,7 @@ if __name__ == '__main__':
     
     # Print model and number of parameters
     print('Defined model:\n', model)
-    # utils.count_parameters(model)
+    utils.count_parameters(model)
     
     # Make src mask for the decoder with size
     # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
