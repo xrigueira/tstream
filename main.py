@@ -30,7 +30,7 @@ def train(dataloader, model, src_mask, memory_mask, tgt_mask, loss_function, opt
         pred, sa_weights_encoder, sa_weights, mha_weights = model(src=src, tgt=tgt, src_mask=src_mask, memory_mask=memory_mask, tgt_mask=tgt_mask)
         pred = pred.to(device)
         loss = loss_function(pred, tgt_y.unsqueeze(2))
-        # print(sa_weights_encoder[0])
+        
         # Backpropagation
         loss.backward()
         optimizer.step()
@@ -124,6 +124,9 @@ if __name__ == '__main__':
     
     # Define seed
     torch.manual_seed(0)
+
+    # Defien run number
+    run = 2
     
     # Hyperparams
     batch_size = 128
@@ -150,6 +153,10 @@ if __name__ == '__main__':
     in_features_decoder_linear_layer = 32
     max_sequence_len = encoder_sequence_len
     batch_first = True
+
+    # Run parameters
+    lr = 0.00015
+    epochs = 5
 
     # Get device
     device = ('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
@@ -232,7 +239,7 @@ if __name__ == '__main__':
     # src_mask = utils.generate_square_subsequent_mask(size=encoder_sequence_len).to(device)
     
     # Make the memory mask for the decoder
-    memory_mask = utils.masker(dim1=output_sequence_len, dim2=encoder_sequence_len).to(device)
+    memory_mask = utils.unmasker(dim1=output_sequence_len, dim2=encoder_sequence_len).to(device)
 
     # Make tgt mask for decoder with size
     # [batch_size*n_heads, output_sequence_length, output_sequence_length]
@@ -241,14 +248,13 @@ if __name__ == '__main__':
 
     # Define optimizer and loss function
     loss_function = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.00015)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # Update model in the training process and test it
-    epochs = 5 # 250
     start_time = time.time()
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_validation = pd.DataFrame(columns=('epoch', 'loss_val'))
-    for t in range(epochs):
+    for t in range(epochs): # epochs is defined in the hyperparameters section above
         print(f"Epoch {t+1}\n-------------------------------")
         train(training_data, model, src_mask, memory_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch=t)
         val(validation_data, model, src_mask, memory_mask, tgt_mask, loss_function, device, df_validation, epoch=t)
@@ -266,6 +272,12 @@ if __name__ == '__main__':
     tgt_y_truth_train_val, tgt_y_hat_train_val = test(training_val_data, model, src_mask, memory_mask, tgt_mask, device)
     tgt_y_truth_test, tgt_y_hat_test = test(testing_data, model, src_mask, memory_mask, tgt_mask, device)
     
+    # Save results
+    utils.logger(run=run, batches=batch_size, d_model=d_model, n_heads=n_heads,
+                encoder_layers=n_encoder_layers, decoder_layers=n_decoder_layers,
+                dim_ll_encoder=in_features_encoder_linear_layer, dim_ll_decoder=in_features_decoder_linear_layer,
+                lr=lr, epochs=epochs)
+
     # Plot loss
     plt.figure(1);plt.clf()
     plt.plot(df_training['epoch'], df_training['loss_train'], '-o', label='loss train')
@@ -274,11 +286,13 @@ if __name__ == '__main__':
     plt.xlabel(r'epoch')
     plt.ylabel(r'loss')
     plt.legend()
-    plt.show()
+    # plt.show()
+
+    plt.savefig(f'results/run_{run}/loss.png', dpi=300)
 
     # Plot testing results
-    utils.plots(tgt_y_truth_train_val, tgt_y_hat_train_val, 'train_val')
-    utils.plots(tgt_y_truth_test, tgt_y_hat_test, 'test')
+    utils.plots(tgt_y_truth_train_val, tgt_y_hat_train_val, 'train_val', run=run)
+    utils.plots(tgt_y_truth_test, tgt_y_hat_test, 'test', run=run)
 
     # Metrics
     utils.metrics(tgt_y_truth_train_val, tgt_y_hat_train_val, 'train_val')

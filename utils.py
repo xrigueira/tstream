@@ -243,7 +243,8 @@ def metrics(truth, hat, phase):
 
     return nse, rmse, pbias, kge
 
-def plots(truth, hat, phase):
+def plots(truth, hat, phase, run):
+    
     """
     Plot the observed and predicted values
     ----------
@@ -263,7 +264,41 @@ def plots(truth, hat, phase):
     plt.xlabel(r'time (days)')
     plt.ylabel(r'y')
     plt.legend()
-    plt.show()
+    # plt.show()
+
+    plt.savefig(f'results/run_{run}/{phase}.png', dpi=300)
+
+def logger(run, batches, d_model, n_heads, encoder_layers, decoder_layers, dim_ll_encoder, dim_ll_decoder, lr, epochs):
+
+    """Save the results of each run. The results
+    are the hyperparameters of the model and the
+    resulting plots.
+    ----------
+    Arguments:
+    run (int): the run number defined by the user.
+    
+    Returns:
+    None.
+    """
+
+    # Create a directory to save the results
+    if not os.path.exists('results/run_{}'.format(run)):
+        os.makedirs('results/run_{}'.format(run))
+    
+    # Save the hyperparameters in a text file
+    with open('results/run_{}/results.txt'.format(run), 'w') as f:
+        f.write('batches: ' + str(batches) + '\n')
+        f.write('d_model: ' + str(d_model) + '\n')
+        f.write('n_heads: ' + str(n_heads) + '\n')
+        f.write('encoder_layers: ' + str(encoder_layers) + '\n')
+        f.write('decoder_layers: ' + str(decoder_layers) + '\n')
+        f.write('dim_ll_encoder: ' + str(dim_ll_encoder) + '\n')
+        f.write('dim_ll_decoder: ' + str(dim_ll_decoder) + '\n')
+        f.write('lr: ' + str(lr) + '\n')
+        f.write('n_epochs: ' + str(epochs) + '\n')
+
+        # Close the file
+        f.close()
 
 def weights_plot(iteration: int):
 
