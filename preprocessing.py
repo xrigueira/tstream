@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import MinMaxScaler
 
-variables = 'masked_SWIT'
-# variables = 'unmasked_SWIT_PET'
+# variables = 'masked_SWIT'
+variables = 'unmasked_SWIT_PET'
 
 if variables == 'masked_SWIT':
 
@@ -24,11 +24,6 @@ if variables == 'masked_SWIT':
 
     # Load y data (stream flow) - element 'Q1' of the loaded matlab object
     y = scipy.io.loadmat('data/y.mat')['Q1']
-
-    # # Plot the data
-    # plt.plot(X)
-    # plt.plot(y)
-    # plt.show()
 
     # Save the data to 
     # Generate dates starting from Jan 1st, 1980

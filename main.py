@@ -126,7 +126,7 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     # Defien run number
-    run = 2
+    run = 8
     
     # Hyperparams
     batch_size = 128
@@ -139,8 +139,8 @@ if __name__ == '__main__':
     # Only use data from this date and onwards
     cutoff_date = datetime.datetime(1980, 1, 1) 
 
-    d_model = 32
-    n_heads = 2
+    d_model = 256
+    n_heads = 4
     n_encoder_layers = 1
     n_decoder_layers = 1 # Remember that with the current implementation it always has a decoder layer that returns the weights
     encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
@@ -149,14 +149,14 @@ if __name__ == '__main__':
     output_sequence_len = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
     window_size = encoder_sequence_len + output_sequence_len # used to slice data into sub-sequences
     step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
-    in_features_encoder_linear_layer = 32
-    in_features_decoder_linear_layer = 32
+    in_features_encoder_linear_layer = 128
+    in_features_decoder_linear_layer = 128
     max_sequence_len = encoder_sequence_len
     batch_first = True
 
     # Run parameters
     lr = 0.00015
-    epochs = 5
+    epochs = 250
 
     # Get device
     device = ('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
