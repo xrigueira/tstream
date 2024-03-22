@@ -126,12 +126,13 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     # Defien run number
-    run = 8
+    run = 9
     
     # Hyperparams
     batch_size = 128
     validation_size = 0.125
-    src_variables = ['X']
+    # src_variables = ['x1']
+    src_variables = ['x1', 'x2']
     tgt_variables = ['y']
     input_variables = src_variables + tgt_variables
     timestamp_col_name = "time"
@@ -139,8 +140,8 @@ if __name__ == '__main__':
     # Only use data from this date and onwards
     cutoff_date = datetime.datetime(1980, 1, 1) 
 
-    d_model = 256
-    n_heads = 4
+    d_model = 32
+    n_heads = 2
     n_encoder_layers = 1
     n_decoder_layers = 1 # Remember that with the current implementation it always has a decoder layer that returns the weights
     encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
@@ -149,8 +150,8 @@ if __name__ == '__main__':
     output_sequence_len = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
     window_size = encoder_sequence_len + output_sequence_len # used to slice data into sub-sequences
     step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
-    in_features_encoder_linear_layer = 128
-    in_features_decoder_linear_layer = 128
+    in_features_encoder_linear_layer = 64
+    in_features_decoder_linear_layer = 64
     max_sequence_len = encoder_sequence_len
     batch_first = True
 
@@ -224,7 +225,8 @@ if __name__ == '__main__':
                                     batch_first=batch_first, d_model=d_model, n_encoder_layers=n_encoder_layers, 
                                     n_decoder_layers=n_decoder_layers, n_heads=n_heads, dropout_encoder=0.2, 
                                     dropout_decoder=0.2, dropout_pos_encoder=0.1, dim_feedforward_encoder=in_features_encoder_linear_layer, 
-                                    dim_feedforward_decoder=in_features_decoder_linear_layer, num_predicted_features=len(tgt_variables)).to(device)
+                                    dim_feedforward_decoder=in_features_decoder_linear_layer, num_src_features=len(src_variables), 
+                                    num_predicted_features=len(tgt_variables)).to(device)
 
     # Send model to device
     model.to(device)

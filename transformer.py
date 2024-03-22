@@ -449,7 +449,8 @@ class TimeSeriesTransformer(nn.Module):
     def __init__(self, input_size: int, decoder_sequence_len: int, batch_first: bool,
                 d_model: int, n_encoder_layers: int, n_decoder_layers: int, n_heads: int,
                 dropout_encoder: float, dropout_decoder: float, dropout_pos_encoder: float,
-                dim_feedforward_encoder: int, dim_feedforward_decoder: int, num_predicted_features: int):
+                dim_feedforward_encoder: int, dim_feedforward_decoder: int,
+                num_src_features: int, num_predicted_features: int):
         super(TimeSeriesTransformer, self).__init__()
         
         """
@@ -480,7 +481,7 @@ class TimeSeriesTransformer(nn.Module):
         # Create the three linear layers needed for the model
         self.encoder_input_layer = nn.Linear(in_features=input_size, out_features=d_model)
         
-        self.decoder_input_layer = nn.Linear(in_features=num_predicted_features, out_features=d_model)
+        self.decoder_input_layer = nn.Linear(in_features=num_src_features, out_features=d_model)
         
         self.linear_mapping = nn.Linear(in_features=d_model, out_features=num_predicted_features)
         
