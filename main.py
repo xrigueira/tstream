@@ -126,7 +126,7 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     # Defien run number
-    run = 15
+    run = 16
     
     # Hyperparams
     batch_size = 128
