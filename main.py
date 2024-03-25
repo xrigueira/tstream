@@ -126,7 +126,7 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     # Defien run number
-    run = 9
+    run = 14
     
     # Hyperparams
     batch_size = 128
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     # [batch_size*n_heads, output_sequence_length, output_sequence_length]
     tgt_mask = utils.masker(dim1=output_sequence_len, dim2=output_sequence_len).to(device)
     # tgt_mask = utils.generate_square_subsequent_mask(size=decoder_sequence_len).to(device)
-
+    
     # Define optimizer and loss function
     loss_function = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -283,7 +283,7 @@ if __name__ == '__main__':
     # Plot loss
     plt.figure(1);plt.clf()
     plt.plot(df_training['epoch'], df_training['loss_train'], '-o', label='loss train')
-    plt.plot(df_training['epoch'], df_validation['loss_val'], '-o', label='loss test')
+    plt.plot(df_training['epoch'], df_validation['loss_val'], '-o', label='loss val')
     plt.yscale('log')
     plt.xlabel(r'epoch')
     plt.ylabel(r'loss')

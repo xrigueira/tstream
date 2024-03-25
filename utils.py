@@ -51,16 +51,6 @@ def unmasker(dim1: int, dim2: int) -> Tensor:
     
     return torch.zeros(dim1, dim2)
 
-def generate_square_subsequent_mask(size):
-        
-        """Generates a square mask for the sequence of a given size. 
-        The masked positions are filled with float('-inf')."""
-        
-        mask = (torch.triu(torch.ones(size, size)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-        
-        return mask
-
 def get_indices(data: pd.DataFrame, window_size: int, step_size: int) -> list:
     
     """
