@@ -126,7 +126,7 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     # Defien run number
-    run = 14
+    run = 15
     
     # Hyperparams
     batch_size = 128
@@ -150,14 +150,14 @@ if __name__ == '__main__':
     output_sequence_len = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
     window_size = encoder_sequence_len + output_sequence_len # used to slice data into sub-sequences
     step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
-    in_features_encoder_linear_layer = 64
-    in_features_decoder_linear_layer = 64
+    in_features_encoder_linear_layer = 32
+    in_features_decoder_linear_layer = 32
     max_sequence_len = encoder_sequence_len
     batch_first = True
 
     # Run parameters
     lr = 0.00015
-    epochs = 250
+    epochs = 150
 
     # Get device
     device = ('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
@@ -212,8 +212,8 @@ if __name__ == '__main__':
     
     # Set up dataloaders
     training_val_data = training_data + validation_data # For testing puporses
-    training_data = DataLoader(training_data, batch_size, shuffle=True)
-    validation_data = DataLoader(validation_data, batch_size, shuffle=True)
+    training_data = DataLoader(training_data, batch_size, shuffle=False)
+    validation_data = DataLoader(validation_data, batch_size, shuffle=False)
     testing_data = DataLoader(testing_data, batch_size=1)
     training_val_data = DataLoader(training_val_data, batch_size=1) # For testing puporses
     
@@ -241,7 +241,8 @@ if __name__ == '__main__':
     # src_mask = utils.generate_square_subsequent_mask(size=encoder_sequence_len).to(device)
     
     # Make the memory mask for the decoder
-    memory_mask = utils.unmasker(dim1=output_sequence_len, dim2=encoder_sequence_len).to(device)
+    # memory_mask = utils.unmasker(dim1=output_sequence_len, dim2=encoder_sequence_len).to(device)
+    memory_mask = None
 
     # Make tgt mask for decoder with size
     # [batch_size*n_heads, output_sequence_length, output_sequence_length]
