@@ -125,8 +125,8 @@ if __name__ == '__main__':
     # Define seed
     torch.manual_seed(0)
 
-    # Defien run number
-    run = 16
+    # Define run number
+    run = 26
     
     # Hyperparams
     batch_size = 128
@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
     # Run parameters
     lr = 0.00015
-    epochs = 150
+    epochs = 250
 
     # Get device
     device = ('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
