@@ -25,113 +25,9 @@ init_notebook_plotting()
 # Define seed
 torch.manual_seed(0)
 
-# Define run number
-run = 26
-
-# Hyperparams
-batch_size = 128
-validation_size = 0.125
-src_variables = ['x1', 'x2']
-tgt_variables = ['y']
-input_variables = src_variables + tgt_variables
-timestamp_col_name = "time"
-
-# Only use data from this date and onwards
-cutoff_date = datetime.datetime(1980, 1, 1)
-
-# d_model = 32
-# n_heads = 2
-n_encoder_layers = 1
-n_decoder_layers = 1
-encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
-crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset 53
-decoder_sequence_len = 1 # length of input given to decoder
-output_sequence_len = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
-window_size = encoder_sequence_len + output_sequence_len # used to slice data into sub-sequences
-step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
-# in_features_encoder_linear_layer = 32
-# in_features_decoder_linear_layer = 32
-max_sequence_len = encoder_sequence_len
-batch_first = True
-
-# Run parameters
-lr = 0.00015
-epochs = 250
-
 # Get device
 device = ('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print(f'Using {device} device')
-
-# Read data
-data = utils.read_data(timestamp_col_name=timestamp_col_name)
-
-# Extract train and test data
-training_val_lower_bound = datetime.datetime(1980, 10, 1)
-training_val_upper_bound = datetime.datetime(2014, 9, 30) # 2010, 9, 30
-
-# Extract train/validation and test data
-training_val_data = data[(training_val_lower_bound <= data.index) & (data.index <= training_val_upper_bound)]
-testing_data = data[data.index > training_val_upper_bound]
-
-# Normalize the data
-from sklearn.preprocessing import MinMaxScaler
-scaler = MinMaxScaler()
-
-# Fit scaler on the training set
-scaler.fit(training_val_data.iloc[:, 1:])
-
-# Transform the training and test sets
-training_val_data.iloc[:, 1:] = scaler.transform(training_val_data.iloc[:, 1:])
-testing_data.iloc[:, 1:] = scaler.transform(testing_data.iloc[:, 1:])
-
-# Make list of (start_idx, end_idx) pairs that are used to slice the time series sequence into chuncks
-training_val_indices = utils.get_indices(data=training_val_data, window_size=window_size, step_size=step_size)
-
-# Divide train data into train and validation data with a 8:1 ratio using the indices.
-# This is done this way because we need 4 years of data to create the summarized nonuniform timesteps,
-# what limits the size of the validation set. However, with this implementation, we use data from the
-# traning part to build the summarized nonuniform timesteps for the validation set. For example, if
-# we use the current validation size, the set would have less than four years of data and would not
-# be able to create the summarized nonuniform timesteps.
-training_indices = training_val_indices[:-(round(len(training_val_indices)*validation_size))]
-validation_indices = training_val_indices[(round(len(training_val_indices)*(1-validation_size))):]
-
-testing_indices = utils.get_indices(data=testing_data, window_size=window_size, step_size=step_size)
-
-# Make instance of the custom dataset class
-training_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
-                                    indices=training_indices, encoder_sequence_len=encoder_sequence_len, 
-                                    decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
-validation_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
-                                    indices=validation_indices, encoder_sequence_len=encoder_sequence_len, 
-                                    decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
-testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variables].values).float(),
-                                    indices=testing_indices, encoder_sequence_len=encoder_sequence_len, 
-                                    decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
-
-# Set up dataloaders
-training_val_data = training_data + validation_data # For testing puporses
-training_data = DataLoader(training_data, batch_size, shuffle=False)
-validation_data = DataLoader(validation_data, batch_size, shuffle=False)
-testing_data = DataLoader(testing_data, batch_size=1)
-training_val_data = DataLoader(training_val_data, batch_size=1) # For testing puporses
-
-# Update the encoder sequence length to its crushed version
-encoder_sequence_len = crushed_encoder_sequence_len
-
-# Make src mask for the decoder with size
-# [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
-src_mask = utils.masker(dim1=encoder_sequence_len, dim2=encoder_sequence_len).to(device)
-# src_mask = utils.generate_square_subsequent_mask(size=encoder_sequence_len).to(device)
-
-# Make the memory mask for the decoder
-# memory_mask = utils.unmasker(dim1=output_sequence_len, dim2=encoder_sequence_len).to(device)
-memory_mask = None
-
-# Make tgt mask for decoder with size
-# [batch_size*n_heads, output_sequence_length, output_sequence_length]
-tgt_mask = utils.masker(dim1=output_sequence_len, dim2=output_sequence_len).to(device)
-# tgt_mask = utils.generate_square_subsequent_mask(size=decoder_sequence_len).to(device)
 
 # Initialize client
 ax_client = AxClient()
@@ -141,17 +37,14 @@ ax_client = AxClient()
 # and optimization configuration (objective name, minimization setting, and outcome constraints).
 # Create an experiment with required arguments: name, parameters, and objective_name.
 ax_client.create_experiment(
-    name="tune_cnn_on_mnist",  # The name of the experiment.
+    name="tune_tstream",  # The name of the experiment.
     parameters=[
         {
-            "name": "lr",  # The name of the parameter.
-            "type": "range",  # The type of the parameter ("range", "choice" or "fixed").
-            "bounds": [1e-5, 0.001],  # The bounds for range parameters. 
-            # "values" The possible values for choice parameters .
-            # "value" The fixed value for fixed parameters.
-            "value_type": "float",  # Optional, the value type ("int", "float", "bool" or "str"). Defaults to inference from type of "bounds".
-            "log_scale": True,  # Optional, whether to use a log scale for range parameters. Defaults to False.
-            # "is_ordered" Optional, a flag for choice parameters.
+            "name": "batch_size",
+            "type": "choice",
+            "values": [128, 256, 512],
+            "value_type": "int",
+            "log_scale": False,
         },
         {
             "name": "d_model",
@@ -169,17 +62,41 @@ ax_client.create_experiment(
         },
         {
             "name": "in_features_encoder_linear_layer",
-            "type": "choice",
-            "values": [32, 64, 128],
+            "type": "fixed",
+            "values": [256],
             "value_type": "int",
             "log_scale": False,
         },
         {
             "name": "in_features_decoder_linear_layer",
-            "type": "choice",
-            "values": [32, 64, 128],
+            "type": "fixed",
+            "values": [256],
             "value_type": "int",
             "log_scale": False,
+        },
+        # {
+        #     "name": "lr",  # The name of the parameter.
+        #     "type": "range",  # The type of the parameter ("range", "choice" or "fixed").
+        #     "bounds": [1e-5, 0.001],  # The bounds for range parameters. 
+        #     # "values" The possible values for choice parameters .
+        #     # "value" The fixed value for fixed parameters.
+        #     "value_type": "float",  # Optional, the value type ("int", "float", "bool" or "str"). Defaults to inference from type of "bounds".
+        #     "log_scale": True,  # Optional, whether to use a log scale for range parameters. Defaults to False.
+        #     # "is_ordered" Optional, a flag for choice parameters.
+        # },
+        {
+            "name": "lr",
+            "type": "choice",
+            "bounds": [0.00001, 0.0001, 0.001],
+            "value_type": "float",
+            "log_scale": False,
+        },
+        {
+            "name": "epochs",  # The name of the parameter.
+            "type": "choice",  # The type of the parameter ("range", "choice" or "fixed").
+            "values": [100, 150, 200, 300, 400, 800],  # The bounds for range parameters. 
+            "value_type": "int",  # Optional, the value type ("int", "float", "bool" or "str"). Defaults to inference from type of "bounds".
+            "log_scale": False,  # Optional, whether to use a log scale for range parameters. Defaults to False.
         },
         
     ],
@@ -190,15 +107,94 @@ ax_client.create_experiment(
 )
 
 # Define function to train, test and evaluate the model
-def train_test_infer(parameterization):
+def train_val_test(parameterization):
     
-    # Extract hyperparameters
-    lr = parameterization["lr"]
+    # Hyperparams
+    batch_size = parameterization["batch_size"]
+    validation_size = 0.125
+    src_variables = ['x1', 'x2']
+    tgt_variables = ['y']
+    input_variables = src_variables + tgt_variables
+    timestamp_col_name = "time"
+
+    # Only use data from this date and onwards
+    cutoff_date = datetime.datetime(1980, 1, 1)
+
     d_model = parameterization["d_model"]
     n_heads = parameterization["n_heads"]
+    n_encoder_layers = 1
+    n_decoder_layers = 1
+    encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
+    crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset 53
+    decoder_sequence_len = 1 # length of input given to decoder
+    output_sequence_len = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
+    window_size = encoder_sequence_len + output_sequence_len # used to slice data into sub-sequences
+    step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step# in_features_encoder_linear_layer = 32
     in_features_encoder_linear_layer = parameterization["in_features_encoder_linear_layer"]
     in_features_decoder_linear_layer = parameterization["in_features_decoder_linear_layer"]
+    max_sequence_len = encoder_sequence_len
+    batch_first = True
     
+    lr = parameterization["lr"]
+    epochs = parameterization["epochs"]
+
+    # Read data
+    data = utils.read_data(timestamp_col_name=timestamp_col_name)
+
+    # Extract train and test data
+    training_val_lower_bound = datetime.datetime(1980, 10, 1)
+    training_val_upper_bound = datetime.datetime(2010, 9, 30)
+
+    # Extract train/validation and test data
+    training_val_data = data[(training_val_lower_bound <= data.index) & (data.index <= training_val_upper_bound)]
+    testing_data = data[data.index > training_val_upper_bound]
+
+    # Normalize the data
+    from sklearn.preprocessing import MinMaxScaler
+    scaler = MinMaxScaler()
+
+    # Fit scaler on the training set
+    scaler.fit(training_val_data.iloc[:, 1:])
+
+    # Transform the training and test sets
+    training_val_data.iloc[:, 1:] = scaler.transform(training_val_data.iloc[:, 1:])
+    testing_data.iloc[:, 1:] = scaler.transform(testing_data.iloc[:, 1:])
+
+    # Make list of (start_idx, end_idx) pairs that are used to slice the time series sequence into chuncks
+    training_val_indices = utils.get_indices(data=training_val_data, window_size=window_size, step_size=step_size)
+
+    # Divide train data into train and validation data with a 8:1 ratio using the indices.
+    # This is done this way because we need 4 years of data to create the summarized nonuniform timesteps,
+    # what limits the size of the validation set. However, with this implementation, we use data from the
+    # traning part to build the summarized nonuniform timesteps for the validation set. For example, if
+    # we use the current validation size, the set would have less than four years of data and would not
+    # be able to create the summarized nonuniform timesteps.
+    training_indices = training_val_indices[:-(round(len(training_val_indices)*validation_size))]
+    validation_indices = training_val_indices[(round(len(training_val_indices)*(1-validation_size))):]
+    
+    testing_indices = utils.get_indices(data=testing_data, window_size=window_size, step_size=step_size)
+    
+    # Make instance of the custom dataset class
+    training_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
+                                        indices=training_indices, encoder_sequence_len=encoder_sequence_len, 
+                                        decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
+    validation_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
+                                        indices=validation_indices, encoder_sequence_len=encoder_sequence_len, 
+                                        decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
+    testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variables].values).float(),
+                                        indices=testing_indices, encoder_sequence_len=encoder_sequence_len, 
+                                        decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
+    
+    # Set up dataloaders
+    training_val_data = training_data + validation_data # For testing puporses
+    training_data = DataLoader(training_data, batch_size, shuffle=False)
+    validation_data = DataLoader(validation_data, batch_size, shuffle=False)
+    testing_data = DataLoader(testing_data, batch_size=1)
+    training_val_data = DataLoader(training_val_data, batch_size=1) # For testing puporses
+    
+    # Update the encoder sequence length to its crushed version
+    encoder_sequence_len = crushed_encoder_sequence_len
+
     # Instantiate the transformer model and send it to device
     model = tst.TimeSeriesTransformer(input_size=len(src_variables), decoder_sequence_len=decoder_sequence_len, 
                                     batch_first=batch_first, d_model=d_model, n_encoder_layers=n_encoder_layers, 
@@ -209,10 +205,20 @@ def train_test_infer(parameterization):
 
     # Send model to device
     model.to(device)
-    
-    # Define optimizer and loss function
-    loss_function = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    # Make src mask for the decoder with size
+    # [batch_size*n_heads, output_sequence_length, encoder_sequence_len]
+    src_mask = utils.masker(dim1=encoder_sequence_len, dim2=encoder_sequence_len).to(device)
+    # src_mask = utils.generate_square_subsequent_mask(size=encoder_sequence_len).to(device)
+
+    # Make the memory mask for the decoder
+    # memory_mask = utils.unmasker(dim1=output_sequence_len, dim2=encoder_sequence_len).to(device)
+    memory_mask = None
+
+    # Make tgt mask for decoder with size
+    # [batch_size*n_heads, output_sequence_length, output_sequence_length]
+    tgt_mask = utils.masker(dim1=output_sequence_len, dim2=output_sequence_len).to(device)
+    # tgt_mask = utils.generate_square_subsequent_mask(size=decoder_sequence_len).to(device)
     
     # Define optimizer and loss function
     loss_function = nn.MSELoss()
@@ -223,7 +229,7 @@ def train_test_infer(parameterization):
     df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
     df_validation = pd.DataFrame(columns=('epoch', 'loss_val'))
     for t in range(epochs): # epochs is defined in the hyperparameters section above
-        print(f"Epoch {t+1}\n-------------------------------")
+        # print(f"Epoch {t+1}\n-------------------------------")
         mn.train(training_data, model, src_mask, memory_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch=t)
         mn.val(validation_data, model, src_mask, memory_mask, tgt_mask, loss_function, device, df_validation, epoch=t)
     print("Done! ---Execution time: %s seconds ---" % (time.time() - start_time))
@@ -232,24 +238,25 @@ def train_test_infer(parameterization):
     tgt_y_truth_test, tgt_y_hat_test = mn.test(testing_data, model, src_mask, memory_mask, tgt_mask, device)
 
     nse = utils.get_nash_sutcliffe_efficiency(tgt_y_truth_test, tgt_y_hat_test)
-    
+    print(f"NSE: {nse}")
     return nse
 
 # Run optimization loop
 # Attach the trial
 ax_client.attach_trial(
-    parameters={"lr": 0.00001, "d_model": 32, "n_heads": 2, "n_encoder_layers": 1, "n_decoder_layers": 1,
-                "in_features_encoder_linear_layer": 32, "in_features_decoder_linear_layer": 32}
+    parameters={"batch_size": 32, "d_model": 32, "n_heads": 2,
+                "in_features_encoder_linear_layer": 256, "in_features_decoder_linear_layer": 256,
+                "lr": 0.001, "epochs": 100}
 )
 
 # Get the parameters and run the trial 
 baseline_parameters = ax_client.get_trial_parameters(trial_index=0)
-ax_client.complete_trial(trial_index=0, raw_data=train_test_infer(baseline_parameters))
+ax_client.complete_trial(trial_index=0, raw_data=train_val_test(baseline_parameters))
 
-for i in range(100):
+for i in range(810):
     parameters, trial_index = ax_client.get_next_trial()
     # Local evaluation here can be replaced with deployment to external system.
-    ax_client.complete_trial(trial_index=trial_index, raw_data=train_test_infer(parameters))
+    ax_client.complete_trial(trial_index=trial_index, raw_data=train_val_test(parameters))
 
 # Maximize the number of trials in parallel
 ax_client.get_max_parallelism()
