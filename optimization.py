@@ -62,14 +62,14 @@ ax_client.create_experiment(
         },
         {
             "name": "in_features_encoder_linear_layer",
-            "type": "fixed",
+            "type": "choice",
             "values": [256],
             "value_type": "int",
             "log_scale": False,
         },
         {
             "name": "in_features_decoder_linear_layer",
-            "type": "fixed",
+            "type": "choice",
             "values": [256],
             "value_type": "int",
             "log_scale": False,
@@ -87,7 +87,7 @@ ax_client.create_experiment(
         {
             "name": "lr",
             "type": "choice",
-            "bounds": [0.00001, 0.0001, 0.001],
+            "values": [0.00001, 0.0001, 0.001],
             "value_type": "float",
             "log_scale": False,
         },
@@ -244,7 +244,7 @@ def train_val_test(parameterization):
 # Run optimization loop
 # Attach the trial
 ax_client.attach_trial(
-    parameters={"batch_size": 32, "d_model": 32, "n_heads": 2,
+    parameters={"batch_size": 128, "d_model": 32, "n_heads": 2,
                 "in_features_encoder_linear_layer": 256, "in_features_decoder_linear_layer": 256,
                 "lr": 0.001, "epochs": 100}
 )
