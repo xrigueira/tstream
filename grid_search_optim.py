@@ -11,6 +11,10 @@ import dataset as ds
 import transformer as tst
 import main as mn
 
+# Ignore warnings
+import warnings
+warnings.filterwarnings("ignore")
+
 """Hyperparameter tuning with Grid Search."""
 
 # Define seed
@@ -48,47 +52,7 @@ data = utils.read_data(timestamp_col_name=timestamp_col_name)
 training_val_lower_bound = datetime.datetime(1980, 10, 1)
 training_val_upper_bound = datetime.datetime(2010, 9, 30)
 
-# Extract train/validation and test data
-training_val_data = data[(training_val_lower_bound <= data.index) & (data.index <= training_val_upper_bound)]
-testing_data = data[data.index > training_val_upper_bound]
-
-# Normalize the data
-from sklearn.preprocessing import MinMaxScaler
-scaler = MinMaxScaler()
-
-# Fit scaler on the training set
-scaler.fit(training_val_data.iloc[:, 1:])
-
-# Transform the training and test sets
-training_val_data.iloc[:, 1:] = scaler.transform(training_val_data.iloc[:, 1:])
-testing_data.iloc[:, 1:] = scaler.transform(testing_data.iloc[:, 1:])
-
-# Make list of (start_idx, end_idx) pairs that are used to slice the time series sequence into chuncks
-training_val_indices = utils.get_indices(data=training_val_data, window_size=window_size, step_size=step_size)
-
-# Divide train data into train and validation data with a 8:1 ratio using the indices.
-# This is done this way because we need 4 years of data to create the summarized nonuniform timesteps,
-# what limits the size of the validation set. However, with this implementation, we use data from the
-# traning part to build the summarized nonuniform timesteps for the validation set. For example, if
-# we use the current validation size, the set would have less than four years of data and would not
-# be able to create the summarized nonuniform timesteps.
-training_indices = training_val_indices[:-(round(len(training_val_indices)*validation_size))]
-validation_indices = training_val_indices[(round(len(training_val_indices)*(1-validation_size))):]
-
-testing_indices = utils.get_indices(data=testing_data, window_size=window_size, step_size=step_size)
-
-# Make instance of the custom dataset class
-training_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
-                                    indices=training_indices, encoder_sequence_len=encoder_sequence_len, 
-                                    decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
-validation_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
-                                    indices=validation_indices, encoder_sequence_len=encoder_sequence_len, 
-                                    decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
-testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variables].values).float(),
-                                    indices=testing_indices, encoder_sequence_len=encoder_sequence_len, 
-                                    decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
-
-
+# Define hyperparameters for grid search
 parameters = {"batch_size": [128, 256, 512], 
             "d_model": [32, 64, 128, 256, 512], 
             "n_heads": [2, 4, 8],
@@ -101,6 +65,9 @@ parameters = {"batch_size": [128, 256, 512],
 # Perform grid search
 results = pd.DataFrame(columns=['batch_size', 'd_model', 'n_heads', 'in_features_encoder_linear_layer', 'in_features_decoder_linear_layer', 'lr', 'epochs', 'NSE'])
 
+# Define number of trials
+trial = 0
+
 for batch_size in parameters["batch_size"]:
     for d_model in parameters["d_model"]:
         for n_heads in parameters["n_heads"]:
@@ -108,6 +75,47 @@ for batch_size in parameters["batch_size"]:
                 for in_features_decoder_linear_layer in parameters["in_features_decoder_linear_layer"]:
                     for lr in parameters["lr"]:
                         for epochs in parameters["epochs"]:
+
+                            # Extract train/validation and test data
+                            training_val_data = data[(training_val_lower_bound <= data.index) & (data.index <= training_val_upper_bound)]
+                            testing_data = data[data.index > training_val_upper_bound]
+
+                            # Normalize the data
+                            from sklearn.preprocessing import MinMaxScaler
+
+                            scaler = MinMaxScaler()
+
+                            # Fit scaler on the training set
+                            scaler.fit(training_val_data.iloc[:, 1:])
+
+                            # Transform the training and test sets
+                            training_val_data.iloc[:, 1:] = scaler.transform(training_val_data.iloc[:, 1:])
+                            testing_data.iloc[:, 1:] = scaler.transform(testing_data.iloc[:, 1:])
+
+                            # Make list of (start_idx, end_idx) pairs that are used to slice the time series sequence into chuncks
+                            training_val_indices = utils.get_indices(data=training_val_data, window_size=window_size, step_size=step_size)
+
+                            # Divide train data into train and validation data with a 8:1 ratio using the indices.
+                            # This is done this way because we need 4 years of data to create the summarized nonuniform timesteps,
+                            # what limits the size of the validation set. However, with this implementation, we use data from the
+                            # traning part to build the summarized nonuniform timesteps for the validation set. For example, if
+                            # we use the current validation size, the set would have less than four years of data and would not
+                            # be able to create the summarized nonuniform timesteps.
+                            training_indices = training_val_indices[:-(round(len(training_val_indices)*validation_size))]
+                            validation_indices = training_val_indices[(round(len(training_val_indices)*(1-validation_size))):]
+
+                            testing_indices = utils.get_indices(data=testing_data, window_size=window_size, step_size=step_size)
+
+                            # Make instance of the custom dataset class
+                            training_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
+                                                                indices=training_indices, encoder_sequence_len=encoder_sequence_len, 
+                                                                decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
+                            validation_data = ds.TransformerDataset(data=torch.tensor(training_val_data[input_variables].values).float(),
+                                                                indices=validation_indices, encoder_sequence_len=encoder_sequence_len, 
+                                                                decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
+                            testing_data = ds.TransformerDataset(data=torch.tensor(testing_data[input_variables].values).float(),
+                                                                indices=testing_indices, encoder_sequence_len=encoder_sequence_len, 
+                                                                decoder_sequence_len=decoder_sequence_len, tgt_sequence_len=output_sequence_len)
 
                             # Set up dataloaders
                             training_val_data = training_data + validation_data # For testing puporses
@@ -153,17 +161,21 @@ for batch_size in parameters["batch_size"]:
                             df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
                             df_validation = pd.DataFrame(columns=('epoch', 'loss_val'))
                             for t in range(epochs): # epochs is defined in the hyperparameters section above
-                                # print(f"Epoch {t+1}\n-------------------------------")
+                                print(f"Epoch {t+1}\n-------------------------------")
                                 mn.train(training_data, model, src_mask, memory_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch=t)
                                 mn.val(validation_data, model, src_mask, memory_mask, tgt_mask, loss_function, device, df_validation, epoch=t)
                             print("Done! ---Execution time: %s seconds ---" % (time.time() - start_time))
-                            
+                            print(f"Running trial {trial} with parameters {parameters}.")
                             # Get NSE metric on inference
                             tgt_y_truth_test, tgt_y_hat_test = mn.test(testing_data, model, src_mask, memory_mask, tgt_mask, device)
 
                             nse = utils.get_nash_sutcliffe_efficiency(tgt_y_truth_test, tgt_y_hat_test)
                             print(f"NSE: {nse}")
 
+                            # Update trial
+                            trial += 1
+
+                            # Update the results
                             results.loc[len(results.index)] = [batch_size, d_model, n_heads, in_features_encoder_linear_layer, in_features_decoder_linear_layer, lr, epochs, nse]
 
                             # Save the results at each step
