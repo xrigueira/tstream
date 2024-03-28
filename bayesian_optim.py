@@ -255,6 +255,7 @@ ax_client.complete_trial(trial_index=0, raw_data=train_val_test(baseline_paramet
 
 for i in range(810):
     parameters, trial_index = ax_client.get_next_trial()
+    print(f"Running trial {trial_index} with parameters {parameters}.")
     # Local evaluation here can be replaced with deployment to external system.
     ax_client.complete_trial(trial_index=trial_index, raw_data=train_val_test(parameters))
 
