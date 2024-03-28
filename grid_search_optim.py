@@ -28,29 +28,9 @@ tgt_variables = ['y']
 input_variables = src_variables + tgt_variables
 timestamp_col_name = "time"
 
-# Only use data from this date and onwards
-cutoff_date = datetime.datetime(1980, 1, 1)
-
-n_encoder_layers = 1
-n_decoder_layers = 1 # Remember that with the current implementation it always has a decoder layer that returns the weights
-encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
-crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset 53
-decoder_sequence_len = 1 # length of input given to decoder
-output_sequence_len = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
-window_size = encoder_sequence_len + output_sequence_len # used to slice data into sub-sequences
-step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
-batch_first = True
-
 # Get device
 device = ('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print(f'Using {device} device')
-
-# Read data
-data = utils.read_data(timestamp_col_name=timestamp_col_name)
-
-# Extract train and test data
-training_val_lower_bound = datetime.datetime(1980, 10, 1)
-training_val_upper_bound = datetime.datetime(2010, 9, 30)
 
 # Define hyperparameters for grid search
 parameters = {"batch_size": [128, 256, 512], 
@@ -75,6 +55,26 @@ for batch_size in parameters["batch_size"]:
                 for in_features_decoder_linear_layer in parameters["in_features_decoder_linear_layer"]:
                     for lr in parameters["lr"]:
                         for epochs in parameters["epochs"]:
+
+                            # Only use data from this date and onwards
+                            cutoff_date = datetime.datetime(1980, 1, 1)
+
+                            n_encoder_layers = 1
+                            n_decoder_layers = 1 # Remember that with the current implementation it always has a decoder layer that returns the weights
+                            encoder_sequence_len = 1461 # length of input given to encoder used to create the pre-summarized windows (4 years of data) 1461
+                            crushed_encoder_sequence_len = 53 # Encoder sequence length afther summarizing the data when defining the dataset 53
+                            decoder_sequence_len = 1 # length of input given to decoder
+                            output_sequence_len = 1 # target sequence length. If hourly data and length = 48, you predict 2 days ahead
+                            window_size = encoder_sequence_len + output_sequence_len # used to slice data into sub-sequences
+                            step_size = 1 # Step size, i.e. how many time steps does the moving window move at each step
+                            batch_first = True
+
+                            # Read data
+                            data = utils.read_data(timestamp_col_name=timestamp_col_name)
+
+                            # Extract train and test data
+                            training_val_lower_bound = datetime.datetime(1980, 10, 1)
+                            training_val_upper_bound = datetime.datetime(2010, 9, 30)
 
                             # Extract train/validation and test data
                             training_val_data = data[(training_val_lower_bound <= data.index) & (data.index <= training_val_upper_bound)]
@@ -161,11 +161,12 @@ for batch_size in parameters["batch_size"]:
                             df_training = pd.DataFrame(columns=('epoch', 'loss_train'))
                             df_validation = pd.DataFrame(columns=('epoch', 'loss_val'))
                             for t in range(epochs): # epochs is defined in the hyperparameters section above
-                                print(f"Epoch {t+1}\n-------------------------------")
+                                # print(f"Epoch {t+1}\n-------------------------------")
                                 mn.train(training_data, model, src_mask, memory_mask, tgt_mask, loss_function, optimizer, device, df_training, epoch=t)
                                 mn.val(validation_data, model, src_mask, memory_mask, tgt_mask, loss_function, device, df_validation, epoch=t)
                             print("Done! ---Execution time: %s seconds ---" % (time.time() - start_time))
-                            print(f"Running trial {trial} with parameters {parameters}.")
+                            print(f"Running trial {trial} with parameters: batch_size {batch_size}, d_model {d_model}, n_heads {n_heads}, nn_enc {in_features_encoder_linear_layer}, nn_dec {in_features_decoder_linear_layer}, lr {lr}, epochs {epochs}.")
+                            
                             # Get NSE metric on inference
                             tgt_y_truth_test, tgt_y_hat_test = mn.test(testing_data, model, src_mask, memory_mask, tgt_mask, device)
 
